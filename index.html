@@ -23,12 +23,12 @@
         .tab.active { background: var(--p); color: white; }
         .task { display: flex; align-items: center; gap: 15px; padding: 16px; border-bottom: 1px solid #334155; border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02); }
         .task.done { opacity: 0.4; }
-        .check { width: 26px; height: 26px; border: 2.5px solid var(--p); border-radius: 50%; cursor: pointer; }
+        .check { width: 26px; height: 26px; border: 2.5px solid var(--p); border-radius: 50%; cursor: pointer; position: relative; }
         .check.checked { background: var(--s); border-color: var(--s); }
+        .check.checked::after { content: '✓'; color: white; position: absolute; left: 5px; top: -2px; font-size: 18px; }
         #energyModal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(2, 6, 23, 0.95); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
         .prog-bg { background: #334155; height: 12px; border-radius: 6px; flex: 1; overflow: hidden; }
         .prog-fill { height: 100%; background: var(--s); width: 0%; transition: 0.8s ease; }
-        .alert { background: rgba(239, 68, 68, 0.1); border-left: 4px solid var(--d); padding: 20px; border-radius: 12px; margin-bottom: 15px; display: none; }
     </style>
 </head>
 <body>
@@ -36,28 +36,22 @@
 <div id="auth-screen">
     <div class="card">
         <h2>RoutineAI Pro ☁️</h2>
-        <input type="email" id="u-email" placeholder="E-mail">
-        <input type="password" id="u-pass" placeholder="Senha">
+        <input type="text" id="u-ghname" placeholder="Usuário Exato do GitHub">
+        <input type="email" id="u-email" placeholder="E-mail de Login">
         <input type="password" id="u-token" placeholder="GitHub Token (PAT)">
         <button class="btn btn-p" onclick="Cloud.login()">Entrar e Sincronizar</button>
+        <p style="font-size:0.7rem; color:var(--mt); margin-top:10px">Verifique se o Token tem permissão 'repo'</p>
     </div>
 </div>
 
 <div id="energyModal">
     <div class="card" style="text-align:center; width: 100%; max-width: 400px;">
         <h3>Check-in de Energia ⚡</h3>
-        <button class="btn" style="background:#334155; color:white; margin-bottom:10px" onclick="API.setEnergy(1)">🔋 Baixa</button>
-        <button class="btn" style="background:#334155; color:white; margin-bottom:10px" onclick="API.setEnergy(3)">⚡ Média</button>
-        <button class="btn btn-p" onclick="API.setEnergy(5)">🔥 Alta</button>
+        <button class="btn" style="background:#334155; color:white; margin-bottom:10px" onclick="API.setEnergy(3)">Começar Dia</button>
     </div>
 </div>
 
 <div class="app" id="main-app">
-    <div id="delayBox" class="alert">
-        🚀 Próxima: <span id="delayTask"></span>
-        <button onclick="API.rescheduleAll()" class="btn btn-p" style="margin-top:10px; padding:10px">Reajustar</button>
-    </div>
-
     <div class="tabs">
         <button class="tab active" onclick="UI.tab('h', this)">Hoje</button>
         <button class="tab" onclick="UI.tab('c', this)">Plano</button>
@@ -69,16 +63,15 @@
             <div class="prog-bg"><div id="p-bar" class="prog-fill"></div></div>
             <b id="p-txt">0%</b>
         </div>
-        <div id="taskList" class="card"></div>
+        <div id="taskList"></div>
     </div>
 
     <div id="v-c" style="display:none">
         <div class="card">
-            <input type="text" id="f-n" placeholder="Atividade">
-            <div style="display:flex; gap:10px">
-                <input type="time" id="f-s">
-                <input type="time" id="f-e">
-            </div>
+            <h4>Nova Atividade</h4>
+            <input type="text" id="f-n" placeholder="Nome">
+            <input type="time" id="f-s">
+            <input type="time" id="f-e">
             <select id="f-k">
                 <option value="Trabalho">💻 Trabalho</option>
                 <option value="Saúde">💪 Saúde</option>
@@ -90,65 +83,65 @@
                 <option value="med" selected>⚡ Média</option>
                 <option value="high">🔥 Alta</option>
             </select>
-            <button class="btn btn-p" onclick="API.add()">Adicionar</button>
+            <button class="btn btn-p" onclick="API.add()">Salvar na Nuvem</button>
         </div>
     </div>
 
     <div id="v-a" style="display:none">
         <div class="card">
-            <h4>Distribuição por Categoria</h4>
+            <h4>Seu Tempo</h4>
             <div style="height:250px"><canvas id="c-p"></canvas></div>
         </div>
     </div>
 </div>
 
 <script>
+
+
 const Cloud = {
     cred: JSON.parse(localStorage.getItem('ri_auth')),
     async login() {
-        const email = document.getElementById('u-email').value;
-        const token = document.getElementById('u-token').value;
-        if(!email || !token) return alert('Email e Token são obrigatórios!');
+        const ghUser = document.getElementById('u-ghname').value.trim();
+        const email = document.getElementById('u-email').value.trim();
+        const token = document.getElementById('u-token').value.trim();
+        if(!ghUser || !token) return alert('Usuário GitHub e Token são obrigatórios!');
         
-        // O userHandle precisa ser o seu nome de usuário real do GitHub para a URL da API funcionar
-        // Se você não sabe o handle, o ideal é pedir o campo "User GitHub" ou extrair via API
-        // Aqui, para simplificar, o código assume que o primeiro campo de login é o seu USER do GitHub.
-        const user = email.split('@')[0]; 
-        
-        this.cred = { user, token, file: `data_${btoa(email).substring(0,8)}.json` };
+        this.cred = { user: ghUser, token, file: `data_${btoa(email).substring(0,8)}.json` };
         localStorage.setItem('ri_auth', JSON.stringify(this.cred));
-        await API.init();
+        location.reload(); // Recarrega para aplicar login
     },
     async request(method, body = null) {
         const url = `https://api.github.com/repos/${this.cred.user}/routine-db/contents/${this.cred.file}`;
         const headers = { 
             'Authorization': `token ${this.cred.token}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json'
+            'Accept': 'application/vnd.github.v3+json'
         };
 
         try {
             const res = await fetch(url, { headers });
             let sha = null;
+            
             if(res.ok) {
                 const data = await res.json();
                 sha = data.sha;
-                if(method === 'GET') return { content: JSON.parse(decodeURIComponent(escape(atob(data.content)))), sha };
-            } else if (method === 'GET' && res.status === 404) {
+                if(method === 'GET') {
+                    const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+                    return { content, sha };
+                }
+            } else if (method === 'GET') {
                 await this.createRepo();
                 return { content: [], sha: null };
             }
 
             if(method === 'PUT') {
                 const content = btoa(unescape(encodeURIComponent(JSON.stringify(body))));
-                const putRes = await fetch(url, {
+                await fetch(url, {
                     method: 'PUT',
                     headers,
-                    body: JSON.stringify({ message: 'Sync RoutineAI', content, sha })
+                    body: JSON.stringify({ message: 'Update', content, sha })
                 });
-                return putRes.ok;
             }
-        } catch(e) { console.error("Erro na Cloud:", e); }
+        } catch(e) { console.error("Falha na sincronização:", e); }
     },
     async createRepo() {
         await fetch('https://api.github.com/user/repos', {
@@ -162,51 +155,36 @@ const Cloud = {
 const API = {
     db: [],
     async init() {
-        if(!Cloud.cred) return;
+        if(!this.cred && !Cloud.cred) return;
         const remote = await Cloud.request('GET');
-        this.db = remote ? remote.content : [];
+        this.db = (remote && remote.content) ? remote.content : [];
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'block';
         if(!localStorage.getItem('ri_energy')) document.getElementById('energyModal').style.display = 'flex';
         UI.render();
     },
-    async sync() {
-        UI.render(); // Update UI immediately for speed
-        await Cloud.request('PUT', this.db);
-    },
-    add() {
+    async add() {
         const n = document.getElementById('f-n').value, s = document.getElementById('f-s').value, 
               e = document.getElementById('f-e').value, k = document.getElementById('f-k').value, d = document.getElementById('f-d').value;
-        if(!n || !s || !e) return alert('Preencha os campos!');
+        if(!n || !s) return alert('Preencha nome e início!');
         this.db.push({ id: Date.now(), name: n, start: s, end: e, cat: k, drain: d, done: false });
         this.db.sort((a,b) => a.start.localeCompare(b.start));
-        this.sync();
-        UI.tab('h', document.querySelectorAll('.tab')[0]); // Volta para o início
+        UI.render();
+        await Cloud.request('PUT', this.db);
     },
-    toggle(id) {
+    async toggle(id) {
         this.db = this.db.map(t => t.id === id ? {...t, done: !t.done} : t);
-        this.sync();
+        UI.render();
+        await Cloud.request('PUT', this.db);
     },
-    remove(id) {
-        if(!confirm('Excluir atividade?')) return;
+    async remove(id) {
         this.db = this.db.filter(t => t.id !== id);
-        this.sync();
+        UI.render();
+        await Cloud.request('PUT', this.db);
     },
     setEnergy(v) {
         localStorage.setItem('ri_energy', v);
         document.getElementById('energyModal').style.display = 'none';
-        this.sync();
-    },
-    rescheduleAll() {
-        let time = new Date();
-        time.setMinutes(time.getMinutes() + 5);
-        this.db = this.db.map(t => {
-            if(t.done) return t;
-            const s = time.toTimeString().slice(0,5);
-            time.setMinutes(time.getMinutes() + 30);
-            return {...t, start: s, end: time.toTimeString().slice(0,5)};
-        });
-        this.sync();
     }
 };
 
@@ -220,40 +198,34 @@ const UI = {
     },
     render() {
         const list = document.getElementById('taskList');
-        list.innerHTML = this.db.map(t => `
+        list.innerHTML = API.db.map(t => `
             <div class="task ${t.done?'done':''}" style="border-right: 4px solid var(--${t.drain==='high'?'d':t.drain==='med'?'w':'s'})">
                 <div class="check ${t.done?'checked':''}" onclick="API.toggle(${t.id})"></div>
                 <div style="flex:1" onclick="API.toggle(${t.id})">
                     <b>${t.name}</b><br>
-                    <small>${t.start} — ${t.end} | ${t.cat}</small>
+                    <small>${t.start} — ${t.end}</small>
                 </div>
                 <button onclick="API.remove(${t.id})" style="background:none; border:none; color:var(--d); font-size:1.2rem">×</button>
             </div>
         `).join('');
-        
-        const p = this.db.length ? Math.round((this.db.filter(t=>t.done).length / this.db.length) * 100) : 0;
+        const p = API.db.length ? Math.round((API.db.filter(t=>t.done).length / API.db.length) * 100) : 0;
         document.getElementById('p-bar').style.width = p+'%';
         document.getElementById('p-txt').innerText = p+'%';
     },
     renderChart() {
-        const ctx = document.getElementById('c-p').getContext('2d');
+        const ctx = document.getElementById('c-p');
         const labels = ['Trabalho', 'Saúde', 'Lazer', 'Essencial'];
-        const data = labels.map(l => this.db.filter(t => t.cat.includes(l)).length);
-        
+        const data = labels.map(l => API.db.filter(t => t.cat.includes(l)).length);
         if(this.chart) this.chart.destroy();
         this.chart = new Chart(ctx, {
             type: 'doughnut',
-            data: {
-                labels,
-                datasets: [{ data, backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'], borderWidth: 0 }]
-            },
+            data: { labels, datasets: [{ data, backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'], borderWidth: 0 }] },
             options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#fff' } } } }
         });
     }
 };
 
-// Auto-init se já tiver credenciais
-if(Cloud.cred) API.init();
+API.init();
 </script>
 </body>
 </html>
