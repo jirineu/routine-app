@@ -13,81 +13,91 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 20px; display: flex; justify-content: center; }
         
-        /* Animações */
+        /* Animações e UI */
         @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-
         .app { width: 100%; max-width: 480px; display: none; animation: slideIn 0.4s ease; }
-        #auth-screen { width: 100%; max-width: 400px; text-align: center; margin-top: 5vh; animation: slideIn 0.4s ease; }
+        #auth-screen { width: 100%; max-width: 400px; text-align: center; margin-top: 5vh; }
         
         .card { background: var(--c); padding: 25px; border-radius: 24px; margin-bottom: 15px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
-        input, select { padding: 16px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: white; width: 100%; margin-bottom: 12px; font-size: 1rem; }
+        .alert { background: rgba(239, 68, 68, 0.15); border-left: 6px solid var(--d); padding: 20px; border-radius: 16px; margin-bottom: 15px; display: none; animation: slideIn 0.3s ease; }
         
-        .btn { padding: 16px; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; width: 100%; transition: 0.2s; font-size: 1rem; }
-        .btn-p { background: var(--p); color: white; }
-        .btn-p:active { transform: scale(0.95); }
+        input, select { padding: 16px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: white; width: 100%; margin-bottom: 12px; font-size: 1rem; }
+        .btn { padding: 14px; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.2s; font-size: 0.9rem; }
+        .btn-p { background: var(--p); color: white; width: 100%; }
+        .btn-act { padding: 8px 16px; margin: 8px 8px 0 0; }
 
-        .tabs { display: flex; gap: 8px; margin-bottom: 20px; background: var(--c); padding: 6px; border-radius: 16px; }
-        .tab { flex: 1; padding: 12px; border-radius: 12px; background: none; color: var(--mt); border: none; cursor: pointer; font-weight: 700; transition: 0.3s; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; background: var(--c); padding: 6px; border-radius: 16px; position: sticky; top: 10px; z-index: 100; }
+        .tab { flex: 1; padding: 12px; border-radius: 12px; background: none; color: var(--mt); border: none; cursor: pointer; font-weight: 700; }
         .tab.active { background: var(--p); color: white; }
 
-        .task { 
-            display: flex; align-items: center; gap: 15px; padding: 16px; 
-            border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02);
-            animation: slideIn 0.3s ease forwards;
-            transition: 0.3s;
-        }
-        .task.done { opacity: 0.5; filter: grayscale(0.5); transform: scale(0.98); }
-        
-        .check { width: 28px; height: 28px; border: 2.5px solid var(--p); border-radius: 50%; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
-        .check.checked { background: var(--s); border-color: var(--s); animation: pulse 0.3s ease; }
+        .task { display: flex; align-items: center; gap: 15px; padding: 16px; border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02); transition: 0.3s; }
+        .task.done { opacity: 0.4; transform: scale(0.98); }
+        .task.drain-high { border-right: 4px solid var(--d); }
+        .task.drain-med { border-right: 4px solid var(--w); }
+        .task.drain-low { border-right: 4px solid var(--s); }
+
+        .check { width: 28px; height: 28px; border: 2.5px solid var(--p); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .check.checked { background: var(--s); border-color: var(--s); }
         .check.checked::after { content: '✓'; color: white; font-weight: bold; }
 
-        #energyModal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(2, 6, 23, 0.95); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .prog-bg { background: #334155; height: 12px; border-radius: 6px; flex: 1; overflow: hidden; margin: 10px 0; }
+        .prog-fill { height: 100%; background: var(--s); width: 0%; transition: 1s cubic-bezier(0.34, 1.56, 0.64, 1); }
         
-        .prog-bg { background: #334155; height: 12px; border-radius: 6px; flex: 1; overflow: hidden; }
-        .prog-fill { height: 100%; background: var(--s); width: 0%; transition: 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #energyModal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(2, 6, 23, 0.95); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .energy-option { padding: 20px; border-radius: 15px; background: var(--c); text-align: center; cursor: pointer; border: 2px solid transparent; }
     </style>
 </head>
 <body>
 
 <div id="auth-screen">
     <div class="card">
-        <h2 style="margin-top:0">RoutineAI Pro ☁️</h2>
-        <input type="text" id="u-ghname" placeholder="Usuário do GitHub">
-        <input type="email" id="u-email" placeholder="Seu E-mail">
+        <h2>RoutineAI Pro Sync ☁️</h2>
+        <input type="text" id="u-ghname" placeholder="Usuário GitHub">
+        <input type="email" id="u-email" placeholder="E-mail">
         <input type="password" id="u-token" placeholder="GitHub Token (PAT)">
         <button class="btn btn-p" onclick="Cloud.login()">Entrar e Sincronizar</button>
     </div>
 </div>
 
 <div id="energyModal">
-    <div class="card" style="text-align:center; width: 100%; max-width: 400px;">
-        <h3 style="margin-top:0">Tudo pronto? ⚡</h3>
-        <p style="color:var(--mt)">Sua rotina será carregada da nuvem.</p>
-        <button class="btn btn-p" onclick="API.closeEnergy()">Começar Agora</button>
+    <div class="card" style="text-align:center; width:100%">
+        <h2>Bom dia! ⚡</h2>
+        <p>Como está sua bateria hoje?</p>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:20px">
+            <div class="energy-option" onclick="API.setDailyEnergy(1)">🔋<br>Baixa</div>
+            <div class="energy-option" onclick="API.setDailyEnergy(3)">⚡<br>Média</div>
+            <div class="energy-option" onclick="API.setDailyEnergy(5)">🔥<br>Alta</div>
+        </div>
     </div>
 </div>
 
 <div class="app" id="main-app">
+    <div id="delayBox" class="alert">
+        <span style="display:block; font-weight:700;">🚀 Hora de agir: <span id="delayTask"></span></span>
+        <button class="btn btn-act" style="background:var(--p); color:white" onclick="API.rescheduleAll()">Reajustar Agenda</button>
+        <button class="btn btn-act" style="background:var(--w); color:white" onclick="API.skip()">Pular esta</button>
+    </div>
+
     <div class="tabs">
-        <button class="tab active" onclick="UI.tab('h', this)">Hoje</button>
-        <button class="tab" onclick="UI.tab('c', this)">Plano</button>
-        <button class="tab" onclick="UI.tab('a', this)">Relatórios</button>
+        <button id="t-h" class="tab active" onclick="UI.tab('h')">Hoje</button>
+        <button id="t-c" class="tab" onclick="UI.tab('c')">Plano</button>
+        <button id="t-a" class="tab" onclick="UI.tab('a')">Analytics</button>
     </div>
 
     <div id="v-h">
-        <div class="card" style="display:flex; align-items:center; gap:12px; padding: 15px 20px;">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; font-weight:800; font-size:0.8rem; color:var(--mt)">
+                <span>PROGRESSO</span><span id="p-txt">0%</span>
+            </div>
             <div class="prog-bg"><div id="p-bar" class="prog-fill"></div></div>
-            <b id="p-txt" style="color:var(--s)">0%</b>
         </div>
         <div id="taskList"></div>
     </div>
 
     <div id="v-c" style="display:none">
         <div class="card">
-            <h3 style="margin-top:0">Nova Atividade</h3>
-            <input type="text" id="f-n" placeholder="O que vamos fazer?">
+            <h3 style="margin-top:0">Novo Hábito</h3>
+            <input type="text" id="f-n" placeholder="Atividade...">
             <div style="display:flex; gap:10px">
                 <input type="time" id="f-s">
                 <input type="time" id="f-e">
@@ -99,39 +109,45 @@
                 <option value="Essencial">☕ Essencial</option>
             </select>
             <select id="f-d">
-                <option value="low">🍃 Drenagem Baixa</option>
-                <option value="med" selected>⚡ Drenagem Média</option>
-                <option value="high">🔥 Drenagem Alta</option>
+                <option value="low">🍃 Baixa</option>
+                <option value="med" selected>⚡ Média</option>
+                <option value="high">🔥 Alta</option>
             </select>
-            <button class="btn btn-p" id="addBtn" onclick="API.add()">Salvar Atividade</button>
+            <button class="btn btn-p" onclick="API.add()">Adicionar ao Plano</button>
         </div>
     </div>
 
     <div id="v-a" style="display:none">
+        <div id="balanceAlert" class="alert" style="background:rgba(245,158,11,0.1); border-color:var(--w); color:var(--w); font-size:0.9rem"></div>
         <div class="card">
-            <h4 style="margin:0 0 15px 0">Distribuição de Tempo</h4>
-            <div style="height:250px"><canvas id="c-p"></canvas></div>
+            <h4 style="margin:0">Onde está seu tempo? (Min)</h4>
+            <div style="height:220px"><canvas id="c-p"></canvas></div>
+        </div>
+        <div class="card">
+            <h4 style="margin:0">Carga por Categoria</h4>
+            <div style="height:220px"><canvas id="c-b"></canvas></div>
         </div>
     </div>
 </div>
 
 <script>
+
+
 const Cloud = {
     cred: JSON.parse(localStorage.getItem('ri_auth')),
     async login() {
         const user = document.getElementById('u-ghname').value.trim();
         const email = document.getElementById('u-email').value.trim();
         const token = document.getElementById('u-token').value.trim();
-        if(!user || !token) return alert('Preencha os dados corretamente!');
-        
+        if(!user || !token) return alert('Campos obrigatórios!');
         this.cred = { user, token, file: `data_${btoa(email).substring(0,8)}.json` };
         localStorage.setItem('ri_auth', JSON.stringify(this.cred));
         location.reload();
     },
     async request(method, body = null) {
+        if(!this.cred) return;
         const url = `https://api.github.com/repos/${this.cred.user}/routine-db/contents/${this.cred.file}`;
         const headers = { 'Authorization': `token ${this.cred.token}`, 'Accept': 'application/vnd.github.v3+json' };
-
         try {
             const res = await fetch(url, { headers });
             let sha = null;
@@ -143,16 +159,11 @@ const Cloud = {
                 await this.createRepo();
                 return { content: [], sha: null };
             }
-
             if(method === 'PUT') {
                 const content = btoa(unescape(encodeURIComponent(JSON.stringify(body))));
-                await fetch(url, {
-                    method: 'PUT',
-                    headers,
-                    body: JSON.stringify({ message: 'Sync', content, sha })
-                });
+                await fetch(url, { method: 'PUT', headers, body: JSON.stringify({ message: 'Sync', content, sha }) });
             }
-        } catch(e) { console.error("Erro Cloud:", e); }
+        } catch(e) { console.error(e); }
     },
     async createRepo() {
         await fetch('https://api.github.com/user/repos', {
@@ -167,96 +178,127 @@ const API = {
     db: [],
     async init() {
         if(!Cloud.cred) return;
+        this.checkReset();
         const remote = await Cloud.request('GET');
         this.db = (remote && remote.content) ? remote.content : [];
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'block';
-        if(!localStorage.getItem('ri_init')) document.getElementById('energyModal').style.display = 'flex';
+        if(!localStorage.getItem('ri_energy_today')) document.getElementById('energyModal').style.display = 'flex';
         UI.render();
+        this.loop();
     },
-    async add() {
-        const btn = document.getElementById('addBtn');
+    checkReset() {
+        const d = new Date().toDateString();
+        if(localStorage.getItem('ri_pro_last') !== d) {
+            localStorage.setItem('ri_pro_last', d);
+            localStorage.removeItem('ri_energy_today');
+        }
+    },
+    loop() {
+        this.checkDelay();
+        setTimeout(() => this.loop(), 30000);
+    },
+    async sync() {
+        UI.render();
+        await Cloud.request('PUT', this.db);
+    },
+    setDailyEnergy(val) {
+        localStorage.setItem('ri_energy_today', val);
+        document.getElementById('energyModal').style.display = 'none';
+        if(val == 1) this.rescheduleAll(15);
+    },
+    add() {
         const n = document.getElementById('f-n').value, s = document.getElementById('f-s').value, 
               e = document.getElementById('f-e').value, k = document.getElementById('f-k').value, d = document.getElementById('f-d').value;
-        
-        if(!n || !s) return alert('Defina pelo menos o nome e início!');
-        
-        btn.innerText = "Sincronizando...";
-        btn.style.opacity = "0.7";
-
+        if(!n || !s || !e) return;
         this.db.push({ id: Date.now(), name: n, start: s, end: e, cat: k, drain: d, done: false });
         this.db.sort((a,b) => a.start.localeCompare(b.start));
-        
-        UI.render();
-        await Cloud.request('PUT', this.db);
-        
-        // Feedback visual e limpa campos
-        btn.innerText = "Salvar Atividade";
-        btn.style.opacity = "1";
-        document.getElementById('f-n').value = "";
-        UI.tab('h', document.querySelectorAll('.tab')[0]);
+        this.sync();
+        UI.tab('h');
     },
-    async toggle(id) {
+    toggle(id) {
         this.db = this.db.map(t => t.id === id ? {...t, done: !t.done} : t);
-        UI.render(); // UI rápida
-        await Cloud.request('PUT', this.db); // Sync fundo
+        this.sync();
     },
-    async remove(id) {
+    remove(id) {
         this.db = this.db.filter(t => t.id !== id);
-        UI.render();
-        await Cloud.request('PUT', this.db);
+        this.sync();
     },
-    closeEnergy() {
-        localStorage.setItem('ri_init', 'true');
-        document.getElementById('energyModal').style.display = 'none';
+    checkDelay() {
+        const now = new Date().toTimeString().slice(0,5);
+        const d = this.db.find(t => !t.done && t.start < now);
+        const box = document.getElementById('delayBox');
+        if(d) {
+            box.style.display = 'block';
+            document.getElementById('delayTask').innerText = d.name;
+            if ("vibrate" in navigator) navigator.vibrate(200);
+        } else { box.style.display = 'none'; }
+    },
+    rescheduleAll(buffer = 5) {
+        let cur = new Date();
+        cur.setMinutes(cur.getMinutes() + buffer);
+        let nextStr = cur.toTimeString().slice(0,5);
+        this.db = this.db.map(t => {
+            if(t.done) return t;
+            const dur = (s, e) => {
+                const [h1, m1] = s.split(':').map(Number), [h2, m2] = e.split(':').map(Number);
+                return (h2 * 60 + m2) - (h1 * 60 + m1);
+            };
+            const d = dur(t.start, t.end);
+            const s = nextStr;
+            let [hh, mm] = s.split(':').map(Number);
+            mm += d; hh += Math.floor(mm/60);
+            const e = `${String(hh%24).padStart(2,'0')}:${String(mm%60).padStart(2,'0')}`;
+            nextStr = e;
+            return {...t, start: s, end: e};
+        });
+        this.sync();
+    },
+    skip() {
+        const now = new Date().toTimeString().slice(0,5);
+        const t = this.db.find(t => !t.done && t.start < now);
+        if(t) t.done = true;
+        this.sync();
     }
 };
 
 const UI = {
-    chart: null,
-    tab(t, el) {
+    charts: {},
+    tab(t) {
         ['h','c','a'].forEach(v => document.getElementById('v-'+v).style.display = v === t ? 'block' : 'none');
-        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-        el.classList.add('active');
-        if(t === 'a') setTimeout(() => this.renderChart(), 100);
+        ['h','c','a'].forEach(v => document.getElementById('t-'+v).classList.toggle('active', v === t));
+        if(t === 'a') setTimeout(() => this.renderAnalytics(), 100);
     },
     render() {
-        const list = document.getElementById('taskList');
-        list.innerHTML = API.db.map(t => `
-            <div class="task ${t.done?'done':''}" style="border-left: 4px solid var(--${t.drain==='high'?'d':t.drain==='med'?'w':'s'})">
-                <div class="check ${t.done?'checked':''}" onclick="API.toggle(${t.id})"></div>
+        const l = document.getElementById('taskList');
+        l.innerHTML = API.db.map(t => `
+            <div class="task ${t.done ? 'done' : ''} drain-${t.drain || 'med'}">
+                <div class="check ${t.done ? 'checked' : ''}" onclick="API.toggle(${t.id})"></div>
                 <div style="flex:1" onclick="API.toggle(${t.id})">
-                    <b style="font-size:1.05rem">${t.name}</b><br>
-                    <small style="color:var(--mt)">${t.start} — ${t.end} | ${t.cat}</small>
+                    <span style="font-weight:700; display:block">${t.name}</span>
+                    <span style="font-size:0.8rem; color:var(--p); font-weight:700">${t.start} — ${t.end}</span>
                 </div>
-                <button onclick="API.remove(${t.id})" style="background:none; border:none; color:var(--d); font-size:1.5rem; cursor:pointer">×</button>
+                <button style="background:none; border:none; color:var(--d); font-size:1.2rem;" onclick="API.remove(${t.id})">×</button>
             </div>
         `).join('');
-        
-        const done = API.db.filter(t=>t.done).length;
-        const p = API.db.length ? Math.round((done / API.db.length) * 100) : 0;
+        const total = API.db.length, done = API.db.filter(t => t.done).length;
+        const p = total ? Math.round((done/total)*100) : 0;
         document.getElementById('p-bar').style.width = p+'%';
         document.getElementById('p-txt').innerText = p+'%';
+        API.checkDelay();
     },
-    renderChart() {
-        const canvas = document.getElementById('c-p');
-        if(!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const labels = ['Trabalho', 'Saúde', 'Lazer', 'Essencial'];
-        const data = labels.map(l => API.db.filter(t => t.cat === l).length);
-        
-        if(this.chart) this.chart.destroy();
-        this.chart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels,
-                datasets: [{ data, backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'], borderWidth: 0 }]
-            },
-            options: { 
-                maintainAspectRatio: false, 
-                plugins: { legend: { position: 'bottom', labels: { color: '#f8fafc', padding: 20 } } } 
-            }
-        });
+    renderAnalytics() {
+        const cats = ['Trabalho', 'Saúde', 'Lazer', 'Essencial'];
+        const getD = (s, e) => {
+            const [h1, m1] = s.split(':').map(Number), [h2, m2] = e.split(':').map(Number);
+            return (h2 * 60 + m2) - (h1 * 60 + m1);
+        };
+        const data = cats.map(c => API.db.filter(t => t.cat === c).reduce((a, b) => a + getD(b.start, b.end), 0));
+        if(this.charts.p) this.charts.p.destroy();
+        if(this.charts.b) this.charts.b.destroy();
+        const colors = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'];
+        this.charts.p = new Chart(document.getElementById('c-p'), { type: 'doughnut', data: { labels: cats, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#fff' } } } } });
+        this.charts.b = new Chart(document.getElementById('c-b'), { type: 'bar', data: { labels: cats, datasets: [{ label: 'Minutos', data, backgroundColor: colors, borderRadius: 8 }] }, options: { maintainAspectRatio: false, scales: { y: { ticks: { color: '#fff' } }, x: { ticks: { color: '#fff' } } } } });
     }
 };
 
