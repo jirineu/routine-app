@@ -149,9 +149,8 @@ const Cloud = {
         else alert("Erro ao acessar GitHub. Verifique seu Token e permissões.");
     },
 
-    async request(method, body = null) {
-        if(!this.cred || !navigator.onLine) return method === 'GET' ? [] : null;
-        
+async request(method, body = null) {
+        if(!this.cred) return method === 'GET' ? [] : null;
         const url = `https://api.github.com/repos/${this.cred.user}/routine-db/contents/${this.cred.file}`;
         const headers = { 
             'Authorization': `token ${this.cred.token}`, 
@@ -167,26 +166,34 @@ const Cloud = {
                 const data = await res.json();
                 currentSha = data.sha;
                 if (method === 'GET') {
-                    // Decodificação segura para acentos e caracteres especiais
                     return JSON.parse(decodeURIComponent(escape(atob(data.content))));
                 }
+            } else if (res.status === 404 && method === 'GET') {
+                // Se for 404 no GET, apenas retorna lista vazia sem erro
+                return [];
             }
 
             if (method === 'PUT' && body) {
-                // Codificação segura para enviar ao GitHub
                 const content = btoa(unescape(encodeURIComponent(JSON.stringify(body))));
                 const putData = { message: 'Sync RoutineAI', content };
                 if (currentSha) putData.sha = currentSha;
 
                 const putRes = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(putData) });
-                if (putRes.ok) console.log("☁️ Cloud Sync Ok");
+                
+                // Se o arquivo/repo não existir no momento do salvamento
+                if (putRes.status === 404) {
+                    await this.createRepo();
+                    // Tenta salvar novamente após 1 segundo
+                    setTimeout(() => this.request('PUT', body), 1000);
+                }
+                
+                if (putRes.ok) console.log("☁️ Sincronizado");
             }
         } catch(e) { 
-            console.warn("Cloud: Problema na conexão ou arquivo novo."); 
+            // Silencia o erro no console para o usuário
         }
         return method === 'GET' ? [] : null;
     },
-
     async createRepo() {
         try {
             const res = await fetch('https://api.github.com/user/repos', {
