@@ -133,8 +133,7 @@
 <script>
 const Cloud = {
     cred: JSON.parse(localStorage.getItem('ri_auth')),
-    lastSha: null, // Armazena o SHA para atualizações posteriores
-
+    
     async login() {
         const user = document.getElementById('u-ghname').value.trim();
         const email = document.getElementById('u-email').value.trim();
@@ -154,39 +153,43 @@ const Cloud = {
         };
 
         try {
-            // Se for PUT, precisamos primeiro pegar o SHA atualizado
-            if (method === 'PUT' || method === 'GET') {
-                const check = await fetch(url, { headers });
-                if (check.ok) {
-                    const data = await check.json();
-                    this.lastSha = data.sha;
-                    if (method === 'GET') {
-                        return { content: JSON.parse(decodeURIComponent(escape(atob(data.content)))), sha: data.sha };
-                    }
-                } else if (method === 'GET') {
-                    await this.createRepo();
-                    return { content: [], sha: null };
+            // 1. Tenta buscar informações do arquivo (SHA)
+            const res = await fetch(url, { headers });
+            let currentSha = null;
+            
+            if (res.ok) {
+                const data = await res.json();
+                currentSha = data.sha;
+                if (method === 'GET') {
+                    const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+                    return Array.isArray(content) ? content : [];
                 }
+            } else if (res.status === 404 && method === 'GET') {
+                await this.createRepo();
+                return [];
             }
 
-            if(method === 'PUT') {
+            // 2. Se for para salvar dados (PUT)
+            if (method === 'PUT' && body) {
                 const content = btoa(unescape(encodeURIComponent(JSON.stringify(body))));
+                const putData = {
+                    message: 'Sync RoutineAI',
+                    content: content
+                };
+
+                // Só envia SHA se o arquivo já existir no GitHub
+                if (currentSha) putData.sha = currentSha;
+
                 const putRes = await fetch(url, { 
                     method: 'PUT', 
                     headers, 
-                    body: JSON.stringify({ 
-                        message: 'Sync RoutineAI', 
-                        content, 
-                        sha: this.lastSha // Essencial para o GitHub aceitar
-                    }) 
+                    body: JSON.stringify(putData) 
                 });
-                if (putRes.ok) {
-                    const resData = await putRes.json();
-                    this.lastSha = resData.content.sha;
-                    console.log("✅ Sincronizado com GitHub");
-                }
+
+                if (putRes.ok) console.log("✅ GitHub Sincronizado");
             }
-        } catch(e) { console.error("Erro na nuvem:", e); }
+        } catch(e) { console.error("Erro Cloud:", e); }
+        return method === 'GET' ? [] : null;
     },
 
     async createRepo() {
@@ -194,54 +197,61 @@ const Cloud = {
             method: 'POST',
             headers: { 'Authorization': `token ${this.cred.token}` },
             body: JSON.stringify({ name: 'routine-db', private: true })
-        });
+        }).catch(() => {});
     }
 };
 
 const API = {
-    // Carrega do localStorage primeiro para resposta instantânea
     db: JSON.parse(localStorage.getItem('ri_pro_db') || '[]'),
 
     async init() {
         if(!Cloud.cred) return;
-        this.checkReset();
         
-        // UI imediata com dados locais
+        const app = document.getElementById('main-app');
+        if(!app) return setTimeout(() => this.init(), 100);
+
         document.getElementById('auth-screen').style.display = 'none';
-        document.getElementById('main-app').style.display = 'block';
+        app.style.display = 'block';
+        
         UI.render();
 
-        // Sincroniza com a nuvem em segundo plano
+        // Busca dados da nuvem para atualizar o local
         const remote = await Cloud.request('GET');
-        if (remote && remote.content) {
-            this.db = remote.content;
-            this.saveLocal();
+        if (remote && Array.isArray(remote)) {
+            this.db = remote;
+            localStorage.setItem('ri_pro_db', JSON.stringify(this.db));
             UI.render();
         }
 
         if(!localStorage.getItem('ri_energy_today')) {
-            document.getElementById('energyModal').style.display = 'flex';
+            const modal = document.getElementById('energyModal');
+            if(modal) modal.style.display = 'flex';
         }
         this.loop();
     },
 
-    checkReset() {
-        const d = new Date().toDateString();
-        if(localStorage.getItem('ri_pro_last') !== d) {
-            localStorage.setItem('ri_pro_last', d);
-            localStorage.removeItem('ri_energy_today');
-            // Opcional: zerar as tarefas feitas aqui se desejar reset diário
-        }
-    },
-
-    saveLocal() {
-        localStorage.setItem('ri_pro_db', JSON.stringify(this.db));
-    },
-
     async sync() {
-        this.saveLocal(); // Backup local imediato
+        // Salva local primeiro (segurança instantânea)
+        localStorage.setItem('ri_pro_db', JSON.stringify(this.db));
         UI.render();
-        await Cloud.request('PUT', this.db); // Backup nuvem
+        // Sincroniza nuvem
+        await Cloud.request('PUT', this.db);
+    },
+
+    checkDelay() {
+        const box = document.getElementById('delayBox');
+        const taskSpan = document.getElementById('delayTask');
+        if(!box || !taskSpan) return;
+
+        const now = new Date().toTimeString().slice(0,5);
+        const d = this.db.find(t => !t.done && t.start < now);
+        
+        if(d) {
+            box.style.display = 'block';
+            taskSpan.innerText = d.name;
+        } else { 
+            box.style.display = 'none'; 
+        }
     },
 
     loop() {
@@ -249,18 +259,18 @@ const API = {
         setTimeout(() => this.loop(), 30000);
     },
 
-    setDailyEnergy(val) {
-        localStorage.setItem('ri_energy_today', val);
-        document.getElementById('energyModal').style.display = 'none';
-        if(val == 1) this.rescheduleAll(15);
-    },
-
     add() {
-        const n = document.getElementById('f-n').value, s = document.getElementById('f-s').value, 
-              e = document.getElementById('f-e').value, k = document.getElementById('f-k').value, d = document.getElementById('f-d').value;
-        if(!n || !s || !e) return alert("Preencha os campos!");
+        const n = document.getElementById('f-n').value, 
+              s = document.getElementById('f-s').value, 
+              e = document.getElementById('f-e').value, 
+              k = document.getElementById('f-k').value, 
+              d = document.getElementById('f-d').value;
+        
+        if(!n || !s || !e) return alert("Preencha o nome e os horários!");
+        
         this.db.push({ id: Date.now(), name: n, start: s, end: e, cat: k, drain: d, done: false });
         this.db.sort((a,b) => a.start.localeCompare(b.start));
+        
         this.sync();
         document.getElementById('f-n').value = '';
         UI.tab('h');
@@ -272,64 +282,36 @@ const API = {
     },
 
     remove(id) {
-        if(confirm("Remover atividade?")) {
+        if(confirm("Deseja remover esta tarefa?")) {
             this.db = this.db.filter(t => t.id !== id);
             this.sync();
         }
     },
 
-    checkDelay() {
-        const now = new Date().toTimeString().slice(0,5);
-        const d = this.db.find(t => !t.done && t.start < now);
-        const box = document.getElementById('delayBox');
-        if(d) {
-            box.style.display = 'block';
-            document.getElementById('delayTask').innerText = d.name;
-            if ("vibrate" in navigator) navigator.vibrate(200);
-        } else { box.style.display = 'none'; }
-    },
-
-    rescheduleAll(buffer = 5) {
-        let cur = new Date();
-        cur.setMinutes(cur.getMinutes() + buffer);
-        let nextStr = cur.toTimeString().slice(0,5);
-        this.db = this.db.map(t => {
-            if(t.done) return t;
-            const dur = (s, e) => {
-                const [h1, m1] = s.split(':').map(Number), [h2, m2] = e.split(':').map(Number);
-                return (h2 * 60 + m2) - (h1 * 60 + m1);
-            };
-            const d = dur(t.start, t.end);
-            const s = nextStr;
-            let [hh, mm] = s.split(':').map(Number);
-            mm += d; hh += Math.floor(mm/60);
-            const e = `${String(hh%24).padStart(2,'0')}:${String(mm%60).padStart(2,'0')}`;
-            nextStr = e;
-            return {...t, start: s, end: e};
-        });
-        this.sync();
-    },
-
-    skip() {
-        const now = new Date().toTimeString().slice(0,5);
-        const t = this.db.find(t => !t.done && t.start < now);
-        if(t) t.done = true;
-        this.sync();
+    setDailyEnergy(val) {
+        localStorage.setItem('ri_energy_today', val);
+        const modal = document.getElementById('energyModal');
+        if(modal) modal.style.display = 'none';
     }
 };
 
 const UI = {
     charts: {},
     tab(t) {
-        ['h','c','a'].forEach(v => document.getElementById('v-'+v).style.display = v === t ? 'block' : 'none');
-        ['h','c','a'].forEach(v => document.getElementById('t-'+v).classList.toggle('active', v === t));
+        ['h','c','a'].forEach(v => {
+            const el = document.getElementById('v-'+v);
+            if(el) el.style.display = v === t ? 'block' : 'none';
+            const tab = document.getElementById('t-'+v);
+            if(tab) tab.classList.toggle('active', v === t);
+        });
         if(t === 'a') setTimeout(() => this.renderAnalytics(), 100);
     },
     render() {
         const l = document.getElementById('taskList');
         if(!l) return;
-        l.innerHTML = API.db.map(t => `
-            <div class="task ${t.done ? 'done' : ''} drain-${t.drain || 'med'}" style="animation: slideIn 0.3s ease;">
+        
+        l.innerHTML = API.db.length ? API.db.map(t => `
+            <div class="task ${t.done ? 'done' : ''} drain-${t.drain || 'med'}">
                 <div class="check ${t.done ? 'checked' : ''}" onclick="API.toggle(${t.id})"></div>
                 <div style="flex:1" onclick="API.toggle(${t.id})">
                     <span style="font-weight:700; display:block">${t.name}</span>
@@ -337,10 +319,11 @@ const UI = {
                 </div>
                 <button style="background:none; border:none; color:var(--d); font-size:1.2rem; cursor:pointer;" onclick="API.remove(${t.id})">×</button>
             </div>
-        `).join('');
+        `).join('') : '<p style="text-align:center; padding:20px; color:var(--mt)">Nenhuma tarefa para hoje.</p>';
         
         const total = API.db.length, done = API.db.filter(t => t.done).length;
         const p = total ? Math.round((done/total)*100) : 0;
+        
         const bar = document.getElementById('p-bar');
         const txt = document.getElementById('p-txt');
         if(bar) bar.style.width = p+'%';
@@ -368,7 +351,7 @@ const UI = {
     }
 };
 
-API.init();
+window.addEventListener('DOMContentLoaded', () => API.init());
 </script>
 </body>
 </html>
