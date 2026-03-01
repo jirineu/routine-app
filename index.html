@@ -135,10 +135,15 @@ const Cloud = {
     cred: JSON.parse(localStorage.getItem('ri_auth')),
     
     async login() {
-        const user = document.getElementById('u-ghname').value.trim();
+        let user = document.getElementById('u-ghname').value.trim();
         const email = document.getElementById('u-email').value.trim();
         const token = document.getElementById('u-token').value.trim();
-        if(!user || !token) return alert('Campos obrigatórios!');
+        
+        // Limpeza automática: se o usuário colar o e-mail no campo de username, extraímos apenas o nome
+        if(user.includes('@')) user = user.split('@')[0];
+
+        if(!user || !token) return alert('Username e Token são obrigatórios!');
+        
         this.cred = { user, token, file: `data_${btoa(email).substring(0,8)}.json` };
         localStorage.setItem('ri_auth', JSON.stringify(this.cred));
         location.reload();
@@ -153,7 +158,7 @@ const Cloud = {
         };
 
         try {
-            // 1. Tenta buscar informações do arquivo (SHA)
+            // 1. Tenta buscar o arquivo para obter o SHA atualizado
             const res = await fetch(url, { headers });
             let currentSha = null;
             
@@ -164,12 +169,16 @@ const Cloud = {
                     const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
                     return Array.isArray(content) ? content : [];
                 }
-            } else if (res.status === 404 && method === 'GET') {
-                await this.createRepo();
-                return [];
+            } else if (res.status === 404) {
+                // Se o arquivo não existe e estamos tentando ler (GET), 
+                // garantimos que o repo existe e retornamos lista vazia.
+                if (method === 'GET') {
+                    await this.createRepo();
+                    return [];
+                }
             }
 
-            // 2. Se for para salvar dados (PUT)
+            // 2. Lógica de Salvamento (PUT)
             if (method === 'PUT' && body) {
                 const content = btoa(unescape(encodeURIComponent(JSON.stringify(body))));
                 const putData = {
@@ -177,7 +186,7 @@ const Cloud = {
                     content: content
                 };
 
-                // Só envia SHA se o arquivo já existir no GitHub
+                // O SHA só é enviado se o arquivo já existir no GitHub
                 if (currentSha) putData.sha = currentSha;
 
                 const putRes = await fetch(url, { 
@@ -186,18 +195,28 @@ const Cloud = {
                     body: JSON.stringify(putData) 
                 });
 
-                if (putRes.ok) console.log("✅ GitHub Sincronizado");
+                if (putRes.ok) {
+                    console.log("✅ GitHub Sincronizado");
+                } else {
+                    const err = await putRes.json();
+                    console.warn("Aviso na Sincronização:", err.message);
+                }
             }
-        } catch(e) { console.error("Erro Cloud:", e); }
+        } catch(e) { 
+            console.error("Erro crítico na comunicação Cloud:", e); 
+        }
         return method === 'GET' ? [] : null;
     },
 
     async createRepo() {
-        await fetch('https://api.github.com/user/repos', {
-            method: 'POST',
-            headers: { 'Authorization': `token ${this.cred.token}` },
-            body: JSON.stringify({ name: 'routine-db', private: true })
-        }).catch(() => {});
+        // Tenta criar o repo; se já existir (422), o GitHub apenas negará e o código segue.
+        try {
+            await fetch('https://api.github.com/user/repos', {
+                method: 'POST',
+                headers: { 'Authorization': `token ${this.cred.token}` },
+                body: JSON.stringify({ name: 'routine-db', private: true })
+            });
+        } catch(e) { /* Silencia erro de repo já existente */ }
     }
 };
 
@@ -207,15 +226,23 @@ const API = {
     async init() {
         if(!Cloud.cred) return;
         
-        const app = document.getElementById('main-app');
-        if(!app) return setTimeout(() => this.init(), 100);
+        // Proteção contra o erro de "null": espera o DOM carregar
+        const checkDOM = setInterval(() => {
+            const app = document.getElementById('main-app');
+            if(app) {
+                clearInterval(checkDOM);
+                this.setupApp();
+            }
+        }, 100);
+    },
 
+    async setupApp() {
         document.getElementById('auth-screen').style.display = 'none';
-        app.style.display = 'block';
+        document.getElementById('main-app').style.display = 'block';
         
         UI.render();
 
-        // Busca dados da nuvem para atualizar o local
+        // Sincroniza dados da nuvem
         const remote = await Cloud.request('GET');
         if (remote && Array.isArray(remote)) {
             this.db = remote;
@@ -231,10 +258,8 @@ const API = {
     },
 
     async sync() {
-        // Salva local primeiro (segurança instantânea)
         localStorage.setItem('ri_pro_db', JSON.stringify(this.db));
         UI.render();
-        // Sincroniza nuvem
         await Cloud.request('PUT', this.db);
     },
 
