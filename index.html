@@ -131,10 +131,10 @@
 </div>
 
 <script>
-
-
 const Cloud = {
     cred: JSON.parse(localStorage.getItem('ri_auth')),
+    lastSha: null, // Armazena o SHA para atualizações posteriores
+
     async login() {
         const user = document.getElementById('u-ghname').value.trim();
         const email = document.getElementById('u-email').value.trim();
@@ -144,27 +144,51 @@ const Cloud = {
         localStorage.setItem('ri_auth', JSON.stringify(this.cred));
         location.reload();
     },
+
     async request(method, body = null) {
         if(!this.cred) return;
         const url = `https://api.github.com/repos/${this.cred.user}/routine-db/contents/${this.cred.file}`;
-        const headers = { 'Authorization': `token ${this.cred.token}`, 'Accept': 'application/vnd.github.v3+json' };
+        const headers = { 
+            'Authorization': `token ${this.cred.token}`, 
+            'Accept': 'application/vnd.github.v3+json' 
+        };
+
         try {
-            const res = await fetch(url, { headers });
-            let sha = null;
-            if(res.ok) {
-                const data = await res.json();
-                sha = data.sha;
-                if(method === 'GET') return { content: JSON.parse(decodeURIComponent(escape(atob(data.content)))), sha };
-            } else if (method === 'GET') {
-                await this.createRepo();
-                return { content: [], sha: null };
+            // Se for PUT, precisamos primeiro pegar o SHA atualizado
+            if (method === 'PUT' || method === 'GET') {
+                const check = await fetch(url, { headers });
+                if (check.ok) {
+                    const data = await check.json();
+                    this.lastSha = data.sha;
+                    if (method === 'GET') {
+                        return { content: JSON.parse(decodeURIComponent(escape(atob(data.content)))), sha: data.sha };
+                    }
+                } else if (method === 'GET') {
+                    await this.createRepo();
+                    return { content: [], sha: null };
+                }
             }
+
             if(method === 'PUT') {
                 const content = btoa(unescape(encodeURIComponent(JSON.stringify(body))));
-                await fetch(url, { method: 'PUT', headers, body: JSON.stringify({ message: 'Sync', content, sha }) });
+                const putRes = await fetch(url, { 
+                    method: 'PUT', 
+                    headers, 
+                    body: JSON.stringify({ 
+                        message: 'Sync RoutineAI', 
+                        content, 
+                        sha: this.lastSha // Essencial para o GitHub aceitar
+                    }) 
+                });
+                if (putRes.ok) {
+                    const resData = await putRes.json();
+                    this.lastSha = resData.content.sha;
+                    console.log("✅ Sincronizado com GitHub");
+                }
             }
-        } catch(e) { console.error(e); }
+        } catch(e) { console.error("Erro na nuvem:", e); }
     },
+
     async createRepo() {
         await fetch('https://api.github.com/user/repos', {
             method: 'POST',
@@ -175,55 +199,85 @@ const Cloud = {
 };
 
 const API = {
-    db: [],
+    // Carrega do localStorage primeiro para resposta instantânea
+    db: JSON.parse(localStorage.getItem('ri_pro_db') || '[]'),
+
     async init() {
         if(!Cloud.cred) return;
         this.checkReset();
-        const remote = await Cloud.request('GET');
-        this.db = (remote && remote.content) ? remote.content : [];
+        
+        // UI imediata com dados locais
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'block';
-        if(!localStorage.getItem('ri_energy_today')) document.getElementById('energyModal').style.display = 'flex';
         UI.render();
+
+        // Sincroniza com a nuvem em segundo plano
+        const remote = await Cloud.request('GET');
+        if (remote && remote.content) {
+            this.db = remote.content;
+            this.saveLocal();
+            UI.render();
+        }
+
+        if(!localStorage.getItem('ri_energy_today')) {
+            document.getElementById('energyModal').style.display = 'flex';
+        }
         this.loop();
     },
+
     checkReset() {
         const d = new Date().toDateString();
         if(localStorage.getItem('ri_pro_last') !== d) {
             localStorage.setItem('ri_pro_last', d);
             localStorage.removeItem('ri_energy_today');
+            // Opcional: zerar as tarefas feitas aqui se desejar reset diário
         }
     },
+
+    saveLocal() {
+        localStorage.setItem('ri_pro_db', JSON.stringify(this.db));
+    },
+
+    async sync() {
+        this.saveLocal(); // Backup local imediato
+        UI.render();
+        await Cloud.request('PUT', this.db); // Backup nuvem
+    },
+
     loop() {
         this.checkDelay();
         setTimeout(() => this.loop(), 30000);
     },
-    async sync() {
-        UI.render();
-        await Cloud.request('PUT', this.db);
-    },
+
     setDailyEnergy(val) {
         localStorage.setItem('ri_energy_today', val);
         document.getElementById('energyModal').style.display = 'none';
         if(val == 1) this.rescheduleAll(15);
     },
+
     add() {
         const n = document.getElementById('f-n').value, s = document.getElementById('f-s').value, 
               e = document.getElementById('f-e').value, k = document.getElementById('f-k').value, d = document.getElementById('f-d').value;
-        if(!n || !s || !e) return;
+        if(!n || !s || !e) return alert("Preencha os campos!");
         this.db.push({ id: Date.now(), name: n, start: s, end: e, cat: k, drain: d, done: false });
         this.db.sort((a,b) => a.start.localeCompare(b.start));
         this.sync();
+        document.getElementById('f-n').value = '';
         UI.tab('h');
     },
+
     toggle(id) {
         this.db = this.db.map(t => t.id === id ? {...t, done: !t.done} : t);
         this.sync();
     },
+
     remove(id) {
-        this.db = this.db.filter(t => t.id !== id);
-        this.sync();
+        if(confirm("Remover atividade?")) {
+            this.db = this.db.filter(t => t.id !== id);
+            this.sync();
+        }
     },
+
     checkDelay() {
         const now = new Date().toTimeString().slice(0,5);
         const d = this.db.find(t => !t.done && t.start < now);
@@ -234,6 +288,7 @@ const API = {
             if ("vibrate" in navigator) navigator.vibrate(200);
         } else { box.style.display = 'none'; }
     },
+
     rescheduleAll(buffer = 5) {
         let cur = new Date();
         cur.setMinutes(cur.getMinutes() + buffer);
@@ -254,6 +309,7 @@ const API = {
         });
         this.sync();
     },
+
     skip() {
         const now = new Date().toTimeString().slice(0,5);
         const t = this.db.find(t => !t.done && t.start < now);
@@ -271,20 +327,24 @@ const UI = {
     },
     render() {
         const l = document.getElementById('taskList');
+        if(!l) return;
         l.innerHTML = API.db.map(t => `
-            <div class="task ${t.done ? 'done' : ''} drain-${t.drain || 'med'}">
+            <div class="task ${t.done ? 'done' : ''} drain-${t.drain || 'med'}" style="animation: slideIn 0.3s ease;">
                 <div class="check ${t.done ? 'checked' : ''}" onclick="API.toggle(${t.id})"></div>
                 <div style="flex:1" onclick="API.toggle(${t.id})">
                     <span style="font-weight:700; display:block">${t.name}</span>
                     <span style="font-size:0.8rem; color:var(--p); font-weight:700">${t.start} — ${t.end}</span>
                 </div>
-                <button style="background:none; border:none; color:var(--d); font-size:1.2rem;" onclick="API.remove(${t.id})">×</button>
+                <button style="background:none; border:none; color:var(--d); font-size:1.2rem; cursor:pointer;" onclick="API.remove(${t.id})">×</button>
             </div>
         `).join('');
+        
         const total = API.db.length, done = API.db.filter(t => t.done).length;
         const p = total ? Math.round((done/total)*100) : 0;
-        document.getElementById('p-bar').style.width = p+'%';
-        document.getElementById('p-txt').innerText = p+'%';
+        const bar = document.getElementById('p-bar');
+        const txt = document.getElementById('p-txt');
+        if(bar) bar.style.width = p+'%';
+        if(txt) txt.innerText = p+'%';
         API.checkDelay();
     },
     renderAnalytics() {
@@ -294,11 +354,17 @@ const UI = {
             return (h2 * 60 + m2) - (h1 * 60 + m1);
         };
         const data = cats.map(c => API.db.filter(t => t.cat === c).reduce((a, b) => a + getD(b.start, b.end), 0));
+        
+        const ctxP = document.getElementById('c-p');
+        const ctxB = document.getElementById('c-b');
+        if(!ctxP || !ctxB) return;
+
         if(this.charts.p) this.charts.p.destroy();
         if(this.charts.b) this.charts.b.destroy();
+        
         const colors = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'];
-        this.charts.p = new Chart(document.getElementById('c-p'), { type: 'doughnut', data: { labels: cats, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#fff' } } } } });
-        this.charts.b = new Chart(document.getElementById('c-b'), { type: 'bar', data: { labels: cats, datasets: [{ label: 'Minutos', data, backgroundColor: colors, borderRadius: 8 }] }, options: { maintainAspectRatio: false, scales: { y: { ticks: { color: '#fff' } }, x: { ticks: { color: '#fff' } } } } });
+        this.charts.p = new Chart(ctxP, { type: 'doughnut', data: { labels: cats, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#fff' } } } } });
+        this.charts.b = new Chart(ctxB, { type: 'bar', data: { labels: cats, datasets: [{ label: 'Minutos', data, backgroundColor: colors, borderRadius: 8 }] }, options: { maintainAspectRatio: false, scales: { y: { ticks: { color: '#fff' } }, x: { ticks: { color: '#fff' } } } } });
     }
 };
 
