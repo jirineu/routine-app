@@ -141,6 +141,10 @@ const Cloud = {
         if(user.includes('@')) user = user.split('@')[0];
         if(!user || !token) return alert('Username e Token são obrigatórios!');
         
+        // CORREÇÃO: Limpa os dados do usuário anterior antes de entrar com o novo
+        API.db = [];
+        localStorage.removeItem('ri_pro_db');
+        
         this.cred = { user, token, file: `data_${btoa(email).substring(0,8)}.json` };
         localStorage.setItem('ri_auth', JSON.stringify(this.cred));
         
@@ -149,7 +153,7 @@ const Cloud = {
         else alert("Erro ao acessar GitHub. Verifique seu Token e permissões.");
     },
 
-async request(method, body = null) {
+    async request(method, body = null) {
         if(!this.cred) return method === 'GET' ? [] : null;
         const url = `https://api.github.com/repos/${this.cred.user}/routine-db/contents/${this.cred.file}`;
         const headers = { 
@@ -169,8 +173,7 @@ async request(method, body = null) {
                     return JSON.parse(decodeURIComponent(escape(atob(data.content))));
                 }
             } else if (res.status === 404 && method === 'GET') {
-                // Se for 404 no GET, apenas retorna lista vazia sem erro
-                return [];
+                return []; // Novo usuário: banco vazio
             }
 
             if (method === 'PUT' && body) {
@@ -180,20 +183,17 @@ async request(method, body = null) {
 
                 const putRes = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(putData) });
                 
-                // Se o arquivo/repo não existir no momento do salvamento
                 if (putRes.status === 404) {
                     await this.createRepo();
-                    // Tenta salvar novamente após 1 segundo
                     setTimeout(() => this.request('PUT', body), 1000);
                 }
                 
                 if (putRes.ok) console.log("☁️ Sincronizado");
             }
-        } catch(e) { 
-            // Silencia o erro no console para o usuário
-        }
+        } catch(e) { /* Silencioso */ }
         return method === 'GET' ? [] : null;
     },
+
     async createRepo() {
         try {
             const res = await fetch('https://api.github.com/user/repos', {
@@ -224,9 +224,9 @@ const API = {
         document.getElementById('main-app').style.display = 'block';
         UI.render();
         
-        // Carrega dados da nuvem
         const remote = await Cloud.request('GET');
-        if (remote && Array.isArray(remote) && remote.length > 0) {
+        // Se a nuvem retornou dados (mesmo que vazios), atualiza o banco local
+        if (remote && Array.isArray(remote)) {
             this.db = remote;
             localStorage.setItem('ri_pro_db', JSON.stringify(this.db));
             UI.render();
@@ -387,3 +387,4 @@ window.addEventListener('DOMContentLoaded', () => API.init());
 </script>
 </body>
 </html>
+
