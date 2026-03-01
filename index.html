@@ -13,7 +13,6 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 20px; display: flex; justify-content: center; }
         
-        /* Animações e UI */
         @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .app { width: 100%; max-width: 480px; display: none; animation: slideIn 0.4s ease; }
         #auth-screen { width: 100%; max-width: 400px; text-align: center; margin-top: 5vh; }
@@ -74,7 +73,7 @@
 <div class="app" id="main-app">
     <div id="delayBox" class="alert">
         <span style="display:block; font-weight:700;">🚀 Hora de agir: <span id="delayTask"></span></span>
-        <button class="btn btn-act" style="background:var(--p); color:white" onclick="API.rescheduleAll()">Reajustar Agenda</button>
+        <button class="btn btn-act" style="background:var(--p); color:white" onclick="API.rescheduleAll()">Adiar 15min</button>
         <button class="btn btn-act" style="background:var(--w); color:white" onclick="API.skip()">Pular esta</button>
     </div>
 
@@ -138,15 +137,15 @@ const Cloud = {
         let user = document.getElementById('u-ghname').value.trim();
         const email = document.getElementById('u-email').value.trim();
         const token = document.getElementById('u-token').value.trim();
-        
-        // Limpeza automática: se o usuário colar o e-mail no campo de username, extraímos apenas o nome
         if(user.includes('@')) user = user.split('@')[0];
-
         if(!user || !token) return alert('Username e Token são obrigatórios!');
-        
         this.cred = { user, token, file: `data_${btoa(email).substring(0,8)}.json` };
         localStorage.setItem('ri_auth', JSON.stringify(this.cred));
-        location.reload();
+        
+        // Verifica/Cria repositório antes de entrar
+        const repoOk = await this.createRepo();
+        if(repoOk) location.reload();
+        else alert("Erro ao acessar GitHub. Verifique seu Token.");
     },
 
     async request(method, body = null) {
@@ -154,11 +153,11 @@ const Cloud = {
         const url = `https://api.github.com/repos/${this.cred.user}/routine-db/contents/${this.cred.file}`;
         const headers = { 
             'Authorization': `token ${this.cred.token}`, 
-            'Accept': 'application/vnd.github.v3+json' 
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
         };
 
         try {
-            // 1. Tenta buscar o arquivo para obter o SHA atualizado
             const res = await fetch(url, { headers });
             let currentSha = null;
             
@@ -166,57 +165,31 @@ const Cloud = {
                 const data = await res.json();
                 currentSha = data.sha;
                 if (method === 'GET') {
-                    const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
-                    return Array.isArray(content) ? content : [];
-                }
-            } else if (res.status === 404) {
-                // Se o arquivo não existe e estamos tentando ler (GET), 
-                // garantimos que o repo existe e retornamos lista vazia.
-                if (method === 'GET') {
-                    await this.createRepo();
-                    return [];
+                    return JSON.parse(decodeURIComponent(escape(atob(data.content))));
                 }
             }
 
-            // 2. Lógica de Salvamento (PUT)
             if (method === 'PUT' && body) {
                 const content = btoa(unescape(encodeURIComponent(JSON.stringify(body))));
-                const putData = {
-                    message: 'Sync RoutineAI',
-                    content: content
-                };
-
-                // O SHA só é enviado se o arquivo já existir no GitHub
+                const putData = { message: 'Sync RoutineAI', content };
                 if (currentSha) putData.sha = currentSha;
 
-                const putRes = await fetch(url, { 
-                    method: 'PUT', 
-                    headers, 
-                    body: JSON.stringify(putData) 
-                });
-
-                if (putRes.ok) {
-                    console.log("✅ GitHub Sincronizado");
-                } else {
-                    const err = await putRes.json();
-                    console.warn("Aviso na Sincronização:", err.message);
-                }
+                const putRes = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(putData) });
+                if (putRes.ok) console.log("☁️ Cloud Sync Ok");
             }
-        } catch(e) { 
-            console.error("Erro crítico na comunicação Cloud:", e); 
-        }
+        } catch(e) { console.error("Erro Cloud:", e); }
         return method === 'GET' ? [] : null;
     },
 
     async createRepo() {
-        // Tenta criar o repo; se já existir (422), o GitHub apenas negará e o código segue.
         try {
-            await fetch('https://api.github.com/user/repos', {
+            const res = await fetch('https://api.github.com/user/repos', {
                 method: 'POST',
                 headers: { 'Authorization': `token ${this.cred.token}` },
                 body: JSON.stringify({ name: 'routine-db', private: true })
             });
-        } catch(e) { /* Silencia erro de repo já existente */ }
+            return res.status === 201 || res.status === 422;
+        } catch(e) { return false; }
     }
 };
 
@@ -225,11 +198,8 @@ const API = {
 
     async init() {
         if(!Cloud.cred) return;
-        
-        // Proteção contra o erro de "null": espera o DOM carregar
         const checkDOM = setInterval(() => {
-            const app = document.getElementById('main-app');
-            if(app) {
+            if(document.getElementById('main-app')) {
                 clearInterval(checkDOM);
                 this.setupApp();
             }
@@ -239,21 +209,14 @@ const API = {
     async setupApp() {
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'block';
-        
         UI.render();
-
-        // Sincroniza dados da nuvem
         const remote = await Cloud.request('GET');
-        if (remote && Array.isArray(remote)) {
+        if (remote && Array.isArray(remote) && remote.length > 0) {
             this.db = remote;
             localStorage.setItem('ri_pro_db', JSON.stringify(this.db));
             UI.render();
         }
-
-        if(!localStorage.getItem('ri_energy_today')) {
-            const modal = document.getElementById('energyModal');
-            if(modal) modal.style.display = 'flex';
-        }
+        if(!localStorage.getItem('ri_energy_today')) document.getElementById('energyModal').style.display = 'flex';
         this.loop();
     },
 
@@ -263,39 +226,11 @@ const API = {
         await Cloud.request('PUT', this.db);
     },
 
-    checkDelay() {
-        const box = document.getElementById('delayBox');
-        const taskSpan = document.getElementById('delayTask');
-        if(!box || !taskSpan) return;
-
-        const now = new Date().toTimeString().slice(0,5);
-        const d = this.db.find(t => !t.done && t.start < now);
-        
-        if(d) {
-            box.style.display = 'block';
-            taskSpan.innerText = d.name;
-        } else { 
-            box.style.display = 'none'; 
-        }
-    },
-
-    loop() {
-        this.checkDelay();
-        setTimeout(() => this.loop(), 30000);
-    },
-
     add() {
-        const n = document.getElementById('f-n').value, 
-              s = document.getElementById('f-s').value, 
-              e = document.getElementById('f-e').value, 
-              k = document.getElementById('f-k').value, 
-              d = document.getElementById('f-d').value;
-        
-        if(!n || !s || !e) return alert("Preencha o nome e os horários!");
-        
-        this.db.push({ id: Date.now(), name: n, start: s, end: e, cat: k, drain: d, done: false });
+        const n = document.getElementById('f-n').value, s = document.getElementById('f-s').value, e = document.getElementById('f-e').value;
+        if(!n || !s || !e) return alert("Preencha Nome e Horários!");
+        this.db.push({ id: Date.now(), name: n, start: s, end: e, cat: document.getElementById('f-k').value, drain: document.getElementById('f-d').value, done: false });
         this.db.sort((a,b) => a.start.localeCompare(b.start));
-        
         this.sync();
         document.getElementById('f-n').value = '';
         UI.tab('h');
@@ -307,16 +242,45 @@ const API = {
     },
 
     remove(id) {
-        if(confirm("Deseja remover esta tarefa?")) {
+        if(confirm("Remover tarefa?")) {
             this.db = this.db.filter(t => t.id !== id);
             this.sync();
         }
     },
 
+    // FUNCIONALIDADES DO ALERTA
+    rescheduleAll() {
+        this.db = this.db.map(t => {
+            if(!t.done) {
+                const [h, m] = t.start.split(':').map(Number);
+                const d = new Date(); d.setHours(h, m + 15);
+                t.start = d.toTimeString().slice(0,5);
+            }
+            return t;
+        });
+        this.sync();
+    },
+
+    skip() {
+        const now = new Date().toTimeString().slice(0,5);
+        const task = this.db.find(t => !t.done && t.start < now);
+        if(task) this.toggle(task.id);
+    },
+
     setDailyEnergy(val) {
         localStorage.setItem('ri_energy_today', val);
-        const modal = document.getElementById('energyModal');
-        if(modal) modal.style.display = 'none';
+        document.getElementById('energyModal').style.display = 'none';
+    },
+
+    loop() {
+        const box = document.getElementById('delayBox'), taskSpan = document.getElementById('delayTask');
+        const now = new Date().toTimeString().slice(0,5);
+        const d = this.db.find(t => !t.done && t.start < now);
+        if(box) {
+            box.style.display = d ? 'block' : 'none';
+            if(d) taskSpan.innerText = d.name;
+        }
+        setTimeout(() => this.loop(), 30000);
     }
 };
 
@@ -324,58 +288,44 @@ const UI = {
     charts: {},
     tab(t) {
         ['h','c','a'].forEach(v => {
-            const el = document.getElementById('v-'+v);
-            if(el) el.style.display = v === t ? 'block' : 'none';
-            const tab = document.getElementById('t-'+v);
-            if(tab) tab.classList.toggle('active', v === t);
+            document.getElementById('v-'+v).style.display = v === t ? 'block' : 'none';
+            document.getElementById('t-'+v).classList.toggle('active', v === t);
         });
         if(t === 'a') setTimeout(() => this.renderAnalytics(), 100);
     },
     render() {
         const l = document.getElementById('taskList');
         if(!l) return;
-        
-        l.innerHTML = API.db.length ? API.db.map(t => `
-            <div class="task ${t.done ? 'done' : ''} drain-${t.drain || 'med'}">
+        l.innerHTML = API.db.map(t => `
+            <div class="task ${t.done ? 'done' : ''} drain-${t.drain}">
                 <div class="check ${t.done ? 'checked' : ''}" onclick="API.toggle(${t.id})"></div>
                 <div style="flex:1" onclick="API.toggle(${t.id})">
-                    <span style="font-weight:700; display:block">${t.name}</span>
-                    <span style="font-size:0.8rem; color:var(--p); font-weight:700">${t.start} — ${t.end}</span>
+                    <strong style="display:block">${t.name}</strong>
+                    <small style="color:var(--mt)">${t.start} — ${t.end} | ${t.cat}</small>
                 </div>
-                <button style="background:none; border:none; color:var(--d); font-size:1.2rem; cursor:pointer;" onclick="API.remove(${t.id})">×</button>
+                <button style="background:none; border:none; color:var(--d); cursor:pointer; font-size:1.2rem" onclick="API.remove(${t.id})">×</button>
             </div>
-        `).join('') : '<p style="text-align:center; padding:20px; color:var(--mt)">Nenhuma tarefa para hoje.</p>';
-        
-        const total = API.db.length, done = API.db.filter(t => t.done).length;
-        const p = total ? Math.round((done/total)*100) : 0;
-        
-        const bar = document.getElementById('p-bar');
-        const txt = document.getElementById('p-txt');
-        if(bar) bar.style.width = p+'%';
-        if(txt) txt.innerText = p+'%';
-        API.checkDelay();
+        `).join('');
+        const done = API.db.filter(t => t.done).length, p = API.db.length ? Math.round((done/API.db.length)*100) : 0;
+        document.getElementById('p-bar').style.width = p+'%';
+        document.getElementById('p-txt').innerText = p+'%';
     },
     renderAnalytics() {
         const cats = ['Trabalho', 'Saúde', 'Lazer', 'Essencial'];
         const getD = (s, e) => {
             const [h1, m1] = s.split(':').map(Number), [h2, m2] = e.split(':').map(Number);
-            return (h2 * 60 + m2) - (h1 * 60 + m1);
+            return Math.max(0, (h2 * 60 + m2) - (h1 * 60 + m1));
         };
         const data = cats.map(c => API.db.filter(t => t.cat === c).reduce((a, b) => a + getD(b.start, b.end), 0));
-        
-        const ctxP = document.getElementById('c-p');
-        const ctxB = document.getElementById('c-b');
-        if(!ctxP || !ctxB) return;
-
-        if(this.charts.p) this.charts.p.destroy();
-        if(this.charts.b) this.charts.b.destroy();
-        
         const colors = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'];
-        this.charts.p = new Chart(ctxP, { type: 'doughnut', data: { labels: cats, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#fff' } } } } });
-        this.charts.b = new Chart(ctxB, { type: 'bar', data: { labels: cats, datasets: [{ label: 'Minutos', data, backgroundColor: colors, borderRadius: 8 }] }, options: { maintainAspectRatio: false, scales: { y: { ticks: { color: '#fff' } }, x: { ticks: { color: '#fff' } } } } });
+        
+        if(this.charts.p) this.charts.p.destroy();
+        this.charts.p = new Chart(document.getElementById('c-p'), { type: 'doughnut', data: { labels: cats, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#fff' } } } } });
+        
+        if(this.charts.b) this.charts.b.destroy();
+        this.charts.b = new Chart(document.getElementById('c-b'), { type: 'bar', data: { labels: cats, datasets: [{ label: 'Minutos', data, backgroundColor: colors, borderRadius: 8 }] }, options: { maintainAspectRatio: false, scales: { y: { ticks: { color: '#fff' } }, x: { ticks: { color: '#fff' } } } } });
     }
 };
-
 window.addEventListener('DOMContentLoaded', () => API.init());
 </script>
 </body>
