@@ -29,25 +29,19 @@
         .tab { flex: 1; padding: 12px; border-radius: 12px; background: none; color: var(--mt); border: none; cursor: pointer; font-weight: 700; }
         .tab.active { background: var(--p); color: white; }
 
-        .task { display: flex; align-items: center; gap: 15px; padding: 16px; border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02); transition: 0.3s; cursor: pointer; }
+        .task { display: flex; align-items: center; gap: 15px; padding: 16px; border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02); transition: 0.3s; }
         .task.done { opacity: 0.4; transform: scale(0.98); }
-        .task.ignored { border-left: 4px solid var(--mt); opacity: 0.6; }
         .task.drain-high { border-right: 4px solid var(--d); }
         .task.drain-med { border-right: 4px solid var(--w); }
         .task.drain-low { border-right: 4px solid var(--s); }
 
-        .check { width: 28px; height: 28px; border: 2.5px solid var(--p); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .check { width: 28px; height: 28px; border: 2.5px solid var(--p); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .check.checked { background: var(--s); border-color: var(--s); }
         .check.checked::after { content: '✓'; color: white; font-weight: bold; }
 
         .prog-bg { background: #334155; height: 12px; border-radius: 6px; flex: 1; overflow: hidden; margin: 10px 0; }
         .prog-fill { height: 100%; background: var(--s); width: 0%; transition: 1s cubic-bezier(0.34, 1.56, 0.64, 1); }
         
-        /* Dias da Semana Selector */
-        .days-selector { display: flex; justify-content: space-between; margin-bottom: 15px; gap: 4px; }
-        .day-btn { flex: 1; padding: 8px 0; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: var(--mt); font-size: 0.7rem; cursor: pointer; font-weight: bold; }
-        .day-btn.active { background: var(--p); color: white; border-color: var(--p); }
-
         #energyModal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(2, 6, 23, 0.95); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
         .energy-option { padding: 20px; border-radius: 15px; background: var(--c); text-align: center; cursor: pointer; border: 2px solid transparent; }
     </style>
@@ -76,16 +70,13 @@
 </div>
 
 <div class="app" id="main-app">
-    <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
-        <button class="btn" style="background: rgba(255,255,255,0.1); color: var(--mt); padding: 5px 12px; font-size: 0.75rem;" onclick="Cloud.logout()">Sair da Conta</button>
-    </div>
-
+  <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+    <button class="btn" style="background: rgba(255,255,255,0.1); color: var(--mt); padding: 5px 12px; font-size: 0.75rem;" onclick="Cloud.logout()">Sair da Conta</button>
+</div>
     <div id="delayBox" class="alert">
         <span style="display:block; font-weight:700;">🚀 Hora de agir: <span id="delayTask"></span></span>
-        <div style="display: flex; gap: 8px;">
-            <button class="btn btn-act" style="background:var(--p); color:white" onclick="API.rescheduleAll()">Adiar 15min</button>
-            <button class="btn btn-act" style="background:var(--w); color:white" onclick="API.skip()">Pular esta</button>
-        </div>
+        <button class="btn btn-act" style="background:var(--p); color:white" onclick="API.rescheduleAll()">Adiar 15min</button>
+        <button class="btn btn-act" style="background:var(--w); color:white" onclick="API.skip()">Pular esta</button>
     </div>
 
     <div class="tabs">
@@ -104,45 +95,53 @@
         <div id="taskList"></div>
     </div>
 
-    <div id="v-c" style="display:none">
-        <div class="card">
-            <input type="hidden" id="f-id">
-            <h3 id="form-title" style="margin-top:0">Novo Hábito</h3>
-            <input type="text" id="f-n" placeholder="Atividade...">
-            
-          <div style="display:flex; gap:10px">
-    <input type="text" id="f-s" oninput="UI.maskTime(this)" maxlength="5" placeholder="00:00">
-<input type="text" id="f-e" oninput="UI.maskTime(this)" maxlength="5" placeholder="00:00">
-</div>
+<div id="v-c" style="display:none">
+    <div class="card">
+        <h3 id="form-title" style="margin-top:0">Novo/Editar Hábito</h3>
+        <input type="hidden" id="f-id"> 
+        
+        <input type="text" id="f-n" placeholder="Atividade...">
+        
+        <div style="display:flex; gap:10px">
+            <input type="text" id="f-s" placeholder="Início (08:00)" maxlength="5" oninput="UI.maskTime(this)"> 
+            <input type="text" id="f-e" placeholder="Fim (09:00)" maxlength="5" oninput="UI.maskTime(this)">
+        </div>
 
-            <div class="days-selector" id="f-days">
-                <button class="day-btn active" data-day="1" onclick="this.classList.toggle('active')">S</button>
-                <button class="day-btn active" data-day="2" onclick="this.classList.toggle('active')">T</button>
-                <button class="day-btn active" data-day="3" onclick="this.classList.toggle('active')">Q</button>
-                <button class="day-btn active" data-day="4" onclick="this.classList.toggle('active')">Q</button>
-                <button class="day-btn active" data-day="5" onclick="this.classList.toggle('active')">S</button>
-                <button class="day-btn active" data-day="6" onclick="this.classList.toggle('active')">S</button>
-                <button class="day-btn active" data-day="0" onclick="this.classList.toggle('active')">D</button>
-            </div>
+        <div style="display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap;" id="day-selector">
+            <style>
+                .day-btn { flex: 1; padding: 8px; border-radius: 8px; background: #334155; border: none; color: white; cursor: pointer; font-size: 0.7rem; font-weight: bold; min-width: 45px;}
+                .day-btn.active { background: var(--s); }
+            </style>
+            <button type="button" class="day-btn" onclick="this.classList.toggle('active')" data-day="0">Dom</button>
+            <button type="button" class="day-btn" onclick="this.classList.toggle('active')" data-day="1">Seg</button>
+            <button type="button" class="day-btn" onclick="this.classList.toggle('active')" data-day="2">Ter</button>
+            <button type="button" class="day-btn" onclick="this.classList.toggle('active')" data-day="3">Qua</button>
+            <button type="button" class="day-btn" onclick="this.classList.toggle('active')" data-day="4">Qui</button>
+            <button type="button" class="day-btn" onclick="this.classList.toggle('active')" data-day="5">Sex</button>
+            <button type="button" class="day-btn" onclick="this.classList.toggle('active')" data-day="6">Sáb</button>
+        </div>
 
-            <select id="f-k">
-                <option value="Trabalho">💻 Trabalho</option>
-                <option value="Saúde">💪 Saúde</option>
-                <option value="Lazer">🎮 Lazer</option>
-                <option value="Essencial">☕ Essencial</option>
-            </select>
-            <select id="f-d">
-                <option value="low">🍃 Baixa Energia</option>
-                <option value="med" selected>⚡ Média Energia</option>
-                <option value="high">🔥 Alta Energia</option>
-            </select>
-            
-            <button id="btn-main" class="btn btn-p" onclick="API.add()">Adicionar ao Plano</button>
-            <button id="btn-cancel" class="btn" style="width:100%; margin-top:8px; display:none; background:transparent; color:var(--mt)" onclick="UI.resetForm()">Cancelar Edição</button>
+        <select id="f-k">
+            <option value="Trabalho">💻 Trabalho</option>
+            <option value="Saúde">💪 Saúde</option>
+            <option value="Lazer">🎮 Lazer</option>
+            <option value="Essencial">☕ Essencial</option>
+        </select>
+        <select id="f-d">
+            <option value="low">🍃 Baixa</option>
+            <option value="med" selected>⚡ Média</option>
+            <option value="high">🔥 Alta</option>
+        </select>
+        
+        <div style="display:flex; gap:10px">
+            <button class="btn btn-p" onclick="API.add()">Salvar Atividade</button>
+            <button id="btn-cancel" class="btn" style="background:#475569; color:white; display:none; flex:1" onclick="UI.clearForm()">Cancelar</button>
         </div>
     </div>
+</div>
 
     <div id="v-a" style="display:none">
+        <div id="balanceAlert" class="alert" style="background:rgba(245,158,11,0.1); border-color:var(--w); color:var(--w); font-size:0.9rem"></div>
         <div class="card">
             <h4 style="margin:0">Onde está seu tempo? (Min)</h4>
             <div style="height:220px"><canvas id="c-p"></canvas></div>
@@ -182,11 +181,13 @@ const Cloud = {
         
         localStorage.setItem('ri_auth', JSON.stringify(this.cred));
         
+        // Verificação simples: tenta ler o repositório. Se falhar, o Token é inválido.
         try {
             const res = await fetch(`https://api.github.com/repos/${this.owner}/routine-db`, {
                 headers: { 'Authorization': `token ${token}` }
             });
             if(res.ok || res.status === 404) { 
+                // status 404 aqui é aceitável pois o arquivo pode não existir ainda
                 location.reload(); 
             } else {
                 alert("Token inválido ou sem acesso ao repositório.");
@@ -226,12 +227,12 @@ const Cloud = {
 
                 const putRes = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(putData) });
                 if (putRes.ok) console.log("☁️ Sincronizado");
+                else if (putRes.status === 403) console.error("Erro 403: Verifique as permissões do Token (Escopo 'repo').");
             }
         } catch(e) { }
         return method === 'GET' ? [] : null;
     }
 };
-
 const API = {
     db: JSON.parse(localStorage.getItem('ri_pro_db') || '[]'),
 
@@ -245,7 +246,19 @@ const API = {
         }, 100);
     },
 
-    async setupApp() {
+   async setupApp() {
+        // --- ADICIONE ESTA TRAVA DE DATA AQUI ---
+        const lastDate = localStorage.getItem('ri_last_date');
+        const todayDate = new Date().toDateString();
+
+        if(lastDate !== todayDate) {
+            localStorage.removeItem('ri_energy_today'); // Força perguntar a energia de novo
+            localStorage.setItem('ri_last_date', todayDate);
+            // Desmarca as tarefas para o novo dia
+            this.db = this.db.map(t => ({ ...t, done: false }));
+        }
+        // ---------------------------------------
+
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'block';
         UI.render();
@@ -263,7 +276,6 @@ const API = {
         }
         this.loop();
     },
-
     async sync() {
         localStorage.setItem('ri_pro_db', JSON.stringify(this.db));
         UI.render();
@@ -271,46 +283,40 @@ const API = {
     },
 
 add() {
-    const idField = document.getElementById('f-id');
-    const id = idField ? idField.value : "";
-    
-    const n = document.getElementById('f-n').value, 
-          s = document.getElementById('f-s').value, 
-          e = document.getElementById('f-e').value;
-    
-    const days = [...document.querySelectorAll('#f-days .day-btn.active')].map(b => parseInt(b.dataset.day));
-    
-    // Validação de formato HH:MM (essencial agora que o input é texto)
-    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if(!n || !timeRegex.test(s) || !timeRegex.test(e) || days.length === 0) {
-        return alert("Preencha Nome, Horários válidos (ex: 08:00) e escolha os Dias!");
-    }
+        const id = document.getElementById('f-id').value;
+        const n = document.getElementById('f-n').value, 
+              s = document.getElementById('f-s').value, 
+              e = document.getElementById('f-e').value;
+        
+        const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+        const days = Array.from(document.querySelectorAll('.day-btn.active')).map(b => parseInt(b.dataset.day));
 
-    const taskData = { 
-        id: id ? parseInt(id) : Date.now(), 
-        name: n, 
-        start: s, 
-        end: e, 
-        cat: document.getElementById('f-k').value, 
-        drain: document.getElementById('f-d').value, 
-        days: days,
-        done: id ? (this.db.find(t => t.id == id)?.done || false) : false,
-        ignored: id ? (this.db.find(t => t.id == id)?.ignored || false) : false
-    };
+        if(!n || !s || !e) return alert("Preencha Nome e Horários!");
+        if(!timeRegex.test(s) || !timeRegex.test(e)) return alert("Horário inválido! Use o formato 00:00");
+        if(days.length === 0) return alert("Selecione pelo menos um dia da semana!");
 
-    if(id) {
-        this.db = this.db.map(t => t.id == id ? taskData : t);
-    } else {
-        this.db.push(taskData);
-    }
-    
-    this.db.sort((a,b) => a.start.localeCompare(b.start));
-    this.sync();
-    UI.resetForm();
-    UI.tab('h');
-},
-    toggle(id) {
-        this.db = this.db.map(t => t.id === id ? {...t, done: !t.done, ignored: false} : t);
+        const taskData = {
+            name: n, start: s, end: e,
+            cat: document.getElementById('f-k').value,
+            drain: document.getElementById('f-d').value,
+            days: days,
+            done: false
+        };
+
+        if(id) {
+            this.db = this.db.map(t => t.id == id ? { ...t, ...taskData, id: parseInt(id) } : t);
+        } else {
+            taskData.id = Date.now();
+            this.db.push(taskData);
+        }
+
+        this.db.sort((a,b) => a.start.localeCompare(b.start));
+        this.sync();
+        UI.clearForm();
+        UI.tab('h');
+    },
+   toggle(id) {
+        this.db = this.db.map(t => t.id === id ? {...t, done: !t.done, skipped: false} : t);
         this.sync();
     },
 
@@ -321,54 +327,108 @@ add() {
         }
     },
 
-    rescheduleAll() {
-        this.db = this.db.map(t => {
-            if(!t.done && !t.ignored) {
-                const [h, m] = t.start.split(':').map(Number);
-                const d = new Date(); 
-                d.setHours(h, m + 15);
-                t.start = d.toTimeString().slice(0,5);
+  rescheduleAll() {
+        const now = new Date();
+        const currentTime = now.toTimeString().slice(0,5);
+        
+        // 1. Encontra a tarefa que deveria estar acontecendo agora e não foi feita
+        const taskToShorten = this.db.find(t => !t.done && t.start < currentTime);
+        
+        if(taskToShorten) {
+            const [h, m] = taskToShorten.start.split(':').map(Number);
+            const d = new Date(); 
+            d.setHours(h, m + 15);
+            
+            const newStart = d.toTimeString().slice(0,5);
+
+            // 2. Só adia se o novo início não ultrapassar o fim da própria tarefa
+            if (newStart < taskToShorten.end) {
+                taskToShorten.start = newStart;
+                this.sync();
+            } else {
+                alert("Não há mais tempo para adiar. Melhor pular ou concluir!");
             }
-            return t;
-        });
-        this.sync();
+        }
     },
 
-    skip() {
+skip() {
         const now = new Date().toTimeString().slice(0,5);
-        const today = new Date().getDay();
-        const task = this.db.find(t => t.days.includes(today) && !t.done && !t.ignored && t.start < now);
+        
+        // Encontra a tarefa que:
+        // 1. Não está pronta (!t.done)
+        // 2. Ainda não foi pulada (!t.skipped)
+        // 3. O horário de início já passou (t.start < now)
+        const task = this.db.find(t => !t.done && !t.skipped && t.start < now);
         
         if(task) {
-            this.db = this.db.map(t => t.id === task.id ? {...t, ignored: true} : t);
+            this.db = this.db.map(t => 
+                t.id === task.id ? {...t, skipped: true} : t
+            );
+            
+            // Fecha o alerta imediatamente após pular
+            const box = document.getElementById('delayBox');
+            if(box) box.style.display = 'none';
+            
             this.sync();
         }
     },
 
-    setDailyEnergy(val) {
+  setDailyEnergy(val) {
         localStorage.setItem('ri_energy_today', val);
         document.getElementById('energyModal').style.display = 'none';
+        this.sync(); // Usa o sync para salvar o reset das tarefas na nuvem também
     },
-
-    loop() {
+   loop() {
         const box = document.getElementById('delayBox'), 
               taskSpan = document.getElementById('delayTask');
-        const now = new Date().toTimeString().slice(0,5);
-        const today = new Date().getDay();
-
-        const d = this.db.find(t => t.days && t.days.includes(today) && !t.done && !t.ignored && t.start < now);
         
-        if(box) {
-            box.style.display = d ? 'block' : 'none';
-            if(d) taskSpan.innerText = d.name;
+        const now = new Date();
+        const currentTime = now.toTimeString().slice(0,5);
+        const today = now.getDay();
+
+        // 1. Filtra tarefas de hoje que não foram feitas nem puladas
+        const activeTasks = this.db
+            .filter(t => t.days && t.days.includes(today) && !t.done && !t.skipped)
+            .sort((a, b) => a.start.localeCompare(b.start));
+
+        // 2. Encontra a tarefa que já deveria ter começado
+        const current = activeTasks.find(t => t.start <= currentTime);
+
+        if (current) {
+            // --- LÓGICA DOS 5 MINUTOS ---
+            const [h, m] = current.start.split(':').map(Number);
+            const startTime = new Date();
+            startTime.setHours(h, m + 5); // Adiciona a tolerância de 5 min
+            const toleranceTime = startTime.toTimeString().slice(0,5);
+            
+            // Verifica se há uma próxima tarefa para a regra do "encosto"
+            const next = activeTasks.find(t => t.start > current.start);
+
+            // O Alerta aparece se:
+            // Passou da tolerância de 5 min OU atingiu o fim da tarefa OU encostou na próxima
+            const shouldAlert = currentTime >= toleranceTime || 
+                                currentTime >= current.end || 
+                                (next && currentTime >= next.start);
+
+            if (shouldAlert) {
+                if(box) {
+                    box.style.display = 'block';
+                    taskSpan.innerText = current.name;
+                }
+            } else {
+                if(box) box.style.display = 'none';
+            }
+        } else {
+            if(box) box.style.display = 'none';
         }
+        
         setTimeout(() => this.loop(), 30000);
-    }
+    },
 };
 
 const UI = {
     charts: {},
-
+    
     tab(t) {
         ['h','c','a'].forEach(v => {
             const view = document.getElementById('v-'+v);
@@ -376,134 +436,124 @@ const UI = {
             if(view) view.style.display = v === t ? 'block' : 'none';
             if(tab) tab.classList.toggle('active', v === t);
         });
-        
-        if(t === 'a') {
-            // Aumentamos levemente o delay para garantir que a aba esteja visível
-            setTimeout(() => this.renderAnalytics(), 150);
-        }
-        if(t !== 'c') this.resetForm();
-        this.render();
+        this.render(); // Garante que a lista atualize ao trocar de aba
+        if(t === 'a') setTimeout(() => this.renderAnalytics(), 100);
     },
 
-    maskTime(i) {
-        let v = i.value.replace(/\D/g, ''); 
-        if (v.length > 2) v = v.substring(0,2) + ':' + v.substring(2,4);
-        i.value = v;
+render() {
+    const l = document.getElementById('taskList');
+    if(!l) return;
+    
+    const today = new Date().getDay();
+    const energy = parseInt(localStorage.getItem('ri_energy_today') || '3');
+
+    const tasksToShow = API.db.filter(t => {
+        const isForToday = (!t.days || t.days.length === 0 || t.days.includes(today));
+        if(!isForToday) return false;
+        if(energy === 1 && t.drain === 'high') return false;
+        return true;
+    });
+
+    l.innerHTML = tasksToShow.map(t => `
+        <div class="task ${(t.done || t.skipped) ? 'done' : ''} drain-${t.drain}">
+            <div class="check ${t.done ? 'checked' : ''}" 
+                 onclick="${t.skipped ? '' : `event.stopPropagation(); API.toggle(${t.id})`}">
+            </div>
+            
+            <div style="flex:1; cursor:pointer" onclick="UI.edit(${t.id})">
+                <strong style="display:block">${t.name} ${t.skipped ? '(Pulada)' : ''}</strong>
+                <small style="color:var(--mt)">${t.start} — ${t.end} | ${t.cat}</small>
+            </div>
+            
+            <button style="background:none; border:none; color:var(--d); cursor:pointer; font-size:1.2rem" 
+                    onclick="event.stopPropagation(); API.remove(${t.id})">×</button>
+        </div>
+    `).join('');
+    
+    // CALCULO DE PORCENTAGEM: Filtra para ignorar as puladas
+    const validForProgress = tasksToShow.filter(t => !t.skipped);
+    const doneCount = validForProgress.filter(t => t.done).length;
+    const p = validForProgress.length ? Math.round((doneCount / validForProgress.length) * 100) : 0;
+    
+    const bar = document.getElementById('p-bar');
+    const txt = document.getElementById('p-txt');
+    if(bar) bar.style.width = p + '%';
+    if(txt) txt.innerText = p + '%';
+},
+    maskTime(input) {
+        let v = input.value.replace(/\D/g, '');
+        if (v.length >= 2) v = v.substring(0, 2) + ':' + v.substring(2, 4);
+        input.value = v;
     },
 
-    render() {
-        const l = document.getElementById('taskList');
-        if(!l) return;
-        const today = new Date().getDay();
-        const tasksToday = API.db.filter(t => t.days && t.days.includes(today));
-        
-        if (tasksToday.length === 0) {
-            l.innerHTML = '<p style="text-align:center; color:var(--mt); margin-top:20px">Nada planejado para hoje!</p>';
-        } else {
-            l.innerHTML = tasksToday.map(t => `
-                <div class="task ${t.done ? 'done' : ''} ${t.ignored ? 'ignored' : ''} drain-${t.drain}">
-                    <div class="check ${t.done ? 'checked' : ''}" onclick="event.stopPropagation(); API.toggle(${t.id})"></div>
-                    <div style="flex:1" onclick="UI.edit(${t.id})">
-                        <strong style="display:block">${t.name} ${t.ignored ? '<small style="opacity:0.6"> (Pulada)</small>' : ''}</strong>
-                        <small style="color:var(--mt)">${t.start} — ${t.end} | ${t.cat}</small>
-                    </div>
-                    <button style="background:none; border:none; color:var(--d); cursor:pointer; font-size:1.2rem" onclick="event.stopPropagation(); API.remove(${t.id})">×</button>
-                </div>
-            `).join('');
-        }
-        
-        const done = tasksToday.filter(t => t.done).length;
-        const p = tasksToday.length ? Math.round((done/tasksToday.length)*100) : 0;
-        const bar = document.getElementById('p-bar');
-        const txt = document.getElementById('p-txt');
-        if(bar) bar.style.width = p+'%';
-        if(txt) txt.innerText = p+'%';
-    },
-
-    edit(id) {
-        const t = API.db.find(task => task.id === id);
+edit(id) {
+        const t = API.db.find(x => x.id === id);
         if(!t) return;
-        this.tab('c');
-        document.getElementById('form-title').innerText = "Editar Hábito";
+
+        this.tab('c'); 
         document.getElementById('f-id').value = t.id;
         document.getElementById('f-n').value = t.name;
         document.getElementById('f-s').value = t.start;
         document.getElementById('f-e').value = t.end;
         document.getElementById('f-k').value = t.cat;
         document.getElementById('f-d').value = t.drain;
-        document.querySelectorAll('#f-days .day-btn').forEach(btn => {
-            btn.classList.toggle('active', t.days.includes(parseInt(btn.dataset.day)));
-        });
-        document.getElementById('btn-main').innerText = "Salvar Alterações";
+        document.getElementById('form-title').innerText = "Editar Atividade";
         document.getElementById('btn-cancel').style.display = "block";
+
+        document.querySelectorAll('.day-btn').forEach(b => {
+            b.classList.toggle('active', t.days && t.days.includes(parseInt(b.dataset.day)));
+        });
     },
 
-    resetForm() {
-        const fId = document.getElementById('f-id');
-        if(!fId) return;
+    clearForm() {
+        document.getElementById('f-id').value = '';
+        document.getElementById('f-n').value = '';
+        document.getElementById('f-s').value = '';
+        document.getElementById('f-e').value = '';
         document.getElementById('form-title').innerText = "Novo Hábito";
-        fId.value = "";
-        document.getElementById('f-n').value = "";
-        document.getElementById('f-s').value = "";
-        document.getElementById('f-e').value = "";
-        document.getElementById('btn-main').innerText = "Adicionar ao Plano";
         document.getElementById('btn-cancel').style.display = "none";
-        document.querySelectorAll('#f-days .day-btn').forEach(b => b.classList.add('active'));
+        document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
     },
 
-    renderAnalytics() {
-        const cats = ['Trabalho', 'Saúde', 'Lazer', 'Essencial'];
-        
-        // Função interna para calcular minutos totais com segurança
-        const getMinutes = (time) => {
-            if(!time || !time.includes(':')) return 0;
-            const [h, m] = time.split(':').map(Number);
-            return (h * 60) + m;
-        };
+renderAnalytics() {
+    const cats = ['Trabalho', 'Saúde', 'Lazer', 'Essencial'];
+    const getD = (s, e) => {
+        const [h1, m1] = s.split(':').map(Number), [h2, m2] = e.split(':').map(Number);
+        return Math.max(0, (h2 * 60 + m2) - (h1 * 60 + m1));
+    };
 
-        const data = cats.map(c => 
-            API.db.filter(t => t.cat === c)
-                  .reduce((acc, task) => acc + Math.max(0, getMinutes(task.end) - getMinutes(task.start)), 0)
-        );
-        
-        const colors = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'];
-        const ctxP = document.getElementById('c-p');
-        const ctxB = document.getElementById('c-b');
-        
-        // Destruição segura para evitar conflitos de Canvas
-        if(this.charts.p) { this.charts.p.destroy(); this.charts.p = null; }
-        if(this.charts.b) { this.charts.b.destroy(); this.charts.b = null; }
+    // FILTRO: Ignora as tarefas que foram "puladas" nos cálculos dos gráficos
+    const dbAtivo = API.db.filter(t => !t.skipped);
 
-        // Só renderiza se houver algum tempo registrado
-        const hasData = data.some(v => v > 0);
-
-        if(ctxP && hasData) {
-            this.charts.p = new Chart(ctxP, { 
-                type: 'doughnut', 
-                data: { labels: cats, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] }, 
-                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#fff', padding: 20 } } } } 
-            });
-        }
-        
-        if(ctxB) {
-            this.charts.b = new Chart(ctxB, { 
-                type: 'bar', 
-                data: { labels: cats, datasets: [{ label: 'Minutos', data, backgroundColor: colors, borderRadius: 8 }] }, 
-                options: { 
-                    maintainAspectRatio: false, 
-                    scales: { 
-                        y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, 
-                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } } 
-                    },
-                    plugins: { legend: { display: false } }
-                } 
-            });
-        }
+    // Agora o 'data' usa o 'dbAtivo' em vez do 'API.db'
+    const data = cats.map(c => dbAtivo.filter(t => t.cat === c).reduce((a, b) => a + getD(b.start, b.end), 0));
+    
+    const colors = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'];
+    
+    const canvasP = document.getElementById('c-p');
+    const canvasB = document.getElementById('c-b');
+    
+    if(canvasP) {
+        if(this.charts.p) this.charts.p.destroy();
+        this.charts.p = new Chart(canvasP, { 
+            type: 'doughnut', 
+            data: { labels: cats, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] }, 
+            options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#fff' } } } } 
+        });
     }
-
-}; 
-
+    
+    if(canvasB) {
+        if(this.charts.b) this.charts.b.destroy();
+        this.charts.b = new Chart(canvasB, { 
+            type: 'bar', 
+            data: { labels: cats, datasets: [{ label: 'Minutos', data, backgroundColor: colors, borderRadius: 8 }] }, 
+            options: { maintainAspectRatio: false, scales: { y: { ticks: { color: '#fff' } }, x: { ticks: { color: '#fff' } } } } 
+        });
+    }
+},
+};
 window.addEventListener('DOMContentLoaded', () => API.init());
 </script>
 </body>
 </html>
+
