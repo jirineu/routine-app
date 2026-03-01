@@ -51,7 +51,6 @@
 <div id="auth-screen">
     <div class="card">
         <h2>RoutineAI Pro Sync ☁️</h2>
-        <input type="text" id="u-ghname" placeholder="Usuário GitHub">
         <input type="email" id="u-email" placeholder="E-mail">
         <input type="password" id="u-token" placeholder="GitHub Token (PAT)">
         <button class="btn btn-p" onclick="Cloud.login()">Entrar e Sincronizar</button>
@@ -131,30 +130,43 @@
 
 <script>
 const Cloud = {
+    // Definimos o dono do repositório como fixo
+    owner: "jirineu",
     cred: JSON.parse(localStorage.getItem('ri_auth')),
     
     async login() {
-        let user = document.getElementById('u-ghname').value.trim();
         const email = document.getElementById('u-email').value.trim();
         const token = document.getElementById('u-token').value.trim();
         
-        if(user.includes('@')) user = user.split('@')[0];
-        if(!user || !token) return alert('Username e Token são obrigatórios!');
+        if(!email || !token) return alert('E-mail e Token são obrigatórios!');
         
-        // CORREÇÃO: Limpa os dados do usuário anterior antes de entrar com o novo
+        // Limpeza total de segurança para não misturar dados de usuários
+        localStorage.clear();
         API.db = [];
-        localStorage.removeItem('ri_pro_db');
         
-        this.cred = { user, token, file: `data_${btoa(email).substring(0,8)}.json` };
+        // Configuramos as credenciais usando o owner fixo
+        // O arquivo JSON será único baseado no e-mail do usuário
+        this.cred = { 
+            user: this.owner, 
+            token: token, 
+            file: `data_${btoa(email).substring(0,8)}.json` 
+        };
+        
         localStorage.setItem('ri_auth', JSON.stringify(this.cred));
         
+        // Tenta validar o acesso ao repositório
         const repoOk = await this.createRepo();
-        if(repoOk) location.reload();
-        else alert("Erro ao acessar GitHub. Verifique seu Token e permissões.");
+        if(repoOk) {
+            location.reload();
+        } else {
+            alert("Erro de autenticação. Verifique se o Token é válido e tem permissão de escrita.");
+        }
     },
 
     async request(method, body = null) {
         if(!this.cred) return method === 'GET' ? [] : null;
+        
+        // A URL agora aponta sempre para /jirineu/routine-db/
         const url = `https://api.github.com/repos/${this.cred.user}/routine-db/contents/${this.cred.file}`;
         const headers = { 
             'Authorization': `token ${this.cred.token}`, 
@@ -173,39 +185,38 @@ const Cloud = {
                     return JSON.parse(decodeURIComponent(escape(atob(data.content))));
                 }
             } else if (res.status === 404 && method === 'GET') {
-                return []; // Novo usuário: banco vazio
+                return []; // Novo e-mail: inicia lista vazia
             }
 
             if (method === 'PUT' && body) {
                 const content = btoa(unescape(encodeURIComponent(JSON.stringify(body))));
-                const putData = { message: 'Sync RoutineAI', content };
+                const putData = { message: `Update: ${this.cred.file}`, content };
                 if (currentSha) putData.sha = currentSha;
 
                 const putRes = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(putData) });
                 
-                if (putRes.status === 404) {
-                    await this.createRepo();
-                    setTimeout(() => this.request('PUT', body), 1000);
-                }
-                
-                if (putRes.ok) console.log("☁️ Sincronizado");
+                if (putRes.ok) console.log("☁️ Sincronizado no repositório de jirineu");
             }
-        } catch(e) { /* Silencioso */ }
+        } catch(e) { console.error("Erro na nuvem:", e); }
         return method === 'GET' ? [] : null;
     },
 
     async createRepo() {
         try {
+            // Verifica se o repositório já existe ou tenta criar na conta de jirineu
             const res = await fetch('https://api.github.com/user/repos', {
                 method: 'POST',
-                headers: { 'Authorization': `token ${this.cred.token}` },
+                headers: { 
+                    'Authorization': `token ${this.cred.token}`,
+                    'Content-Type': 'application/json' 
+                },
                 body: JSON.stringify({ name: 'routine-db', private: true })
             });
-            return res.status === 201 || res.status === 422;
+            // 201 (criado) ou 422 (já existe) são sucessos para nós
+            return res.ok || res.status === 422;
         } catch(e) { return false; }
     }
 };
-
 const API = {
     db: JSON.parse(localStorage.getItem('ri_pro_db') || '[]'),
 
