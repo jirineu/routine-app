@@ -12,42 +12,60 @@
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .app { width: 100%; max-width: 480px; display: none; }
-        #auth-screen { width: 100%; max-width: 400px; text-align: center; margin-top: 5vh; }
+        
+        /* Animações */
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        .app { width: 100%; max-width: 480px; display: none; animation: slideIn 0.4s ease; }
+        #auth-screen { width: 100%; max-width: 400px; text-align: center; margin-top: 5vh; animation: slideIn 0.4s ease; }
+        
         .card { background: var(--c); padding: 25px; border-radius: 24px; margin-bottom: 15px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
         input, select { padding: 16px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: white; width: 100%; margin-bottom: 12px; font-size: 1rem; }
+        
         .btn { padding: 16px; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; width: 100%; transition: 0.2s; font-size: 1rem; }
         .btn-p { background: var(--p); color: white; }
+        .btn-p:active { transform: scale(0.95); }
+
         .tabs { display: flex; gap: 8px; margin-bottom: 20px; background: var(--c); padding: 6px; border-radius: 16px; }
-        .tab { flex: 1; padding: 12px; border-radius: 12px; background: none; color: var(--mt); border: none; cursor: pointer; font-weight: 700; }
+        .tab { flex: 1; padding: 12px; border-radius: 12px; background: none; color: var(--mt); border: none; cursor: pointer; font-weight: 700; transition: 0.3s; }
         .tab.active { background: var(--p); color: white; }
-        .task { display: flex; align-items: center; gap: 15px; padding: 16px; border-bottom: 1px solid #334155; border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02); }
-        .task.done { opacity: 0.4; }
-        .check { width: 26px; height: 26px; border: 2.5px solid var(--p); border-radius: 50%; cursor: pointer; position: relative; }
-        .check.checked { background: var(--s); border-color: var(--s); }
-        .check.checked::after { content: '✓'; color: white; position: absolute; left: 5px; top: -2px; font-size: 18px; }
+
+        .task { 
+            display: flex; align-items: center; gap: 15px; padding: 16px; 
+            border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02);
+            animation: slideIn 0.3s ease forwards;
+            transition: 0.3s;
+        }
+        .task.done { opacity: 0.5; filter: grayscale(0.5); transform: scale(0.98); }
+        
+        .check { width: 28px; height: 28px; border: 2.5px solid var(--p); border-radius: 50%; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .check.checked { background: var(--s); border-color: var(--s); animation: pulse 0.3s ease; }
+        .check.checked::after { content: '✓'; color: white; font-weight: bold; }
+
         #energyModal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(2, 6, 23, 0.95); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        
         .prog-bg { background: #334155; height: 12px; border-radius: 6px; flex: 1; overflow: hidden; }
-        .prog-fill { height: 100%; background: var(--s); width: 0%; transition: 0.8s ease; }
+        .prog-fill { height: 100%; background: var(--s); width: 0%; transition: 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     </style>
 </head>
 <body>
 
 <div id="auth-screen">
     <div class="card">
-        <h2>RoutineAI Pro ☁️</h2>
-        <input type="text" id="u-ghname" placeholder="Usuário Exato do GitHub">
-        <input type="email" id="u-email" placeholder="E-mail de Login">
+        <h2 style="margin-top:0">RoutineAI Pro ☁️</h2>
+        <input type="text" id="u-ghname" placeholder="Usuário do GitHub">
+        <input type="email" id="u-email" placeholder="Seu E-mail">
         <input type="password" id="u-token" placeholder="GitHub Token (PAT)">
         <button class="btn btn-p" onclick="Cloud.login()">Entrar e Sincronizar</button>
-        <p style="font-size:0.7rem; color:var(--mt); margin-top:10px">Verifique se o Token tem permissão 'repo'</p>
     </div>
 </div>
 
 <div id="energyModal">
     <div class="card" style="text-align:center; width: 100%; max-width: 400px;">
-        <h3>Check-in de Energia ⚡</h3>
-        <button class="btn" style="background:#334155; color:white; margin-bottom:10px" onclick="API.setEnergy(3)">Começar Dia</button>
+        <h3 style="margin-top:0">Tudo pronto? ⚡</h3>
+        <p style="color:var(--mt)">Sua rotina será carregada da nuvem.</p>
+        <button class="btn btn-p" onclick="API.closeEnergy()">Começar Agora</button>
     </div>
 </div>
 
@@ -59,19 +77,21 @@
     </div>
 
     <div id="v-h">
-        <div class="card" style="display:flex; align-items:center; gap:12px">
+        <div class="card" style="display:flex; align-items:center; gap:12px; padding: 15px 20px;">
             <div class="prog-bg"><div id="p-bar" class="prog-fill"></div></div>
-            <b id="p-txt">0%</b>
+            <b id="p-txt" style="color:var(--s)">0%</b>
         </div>
         <div id="taskList"></div>
     </div>
 
     <div id="v-c" style="display:none">
         <div class="card">
-            <h4>Nova Atividade</h4>
-            <input type="text" id="f-n" placeholder="Nome">
-            <input type="time" id="f-s">
-            <input type="time" id="f-e">
+            <h3 style="margin-top:0">Nova Atividade</h3>
+            <input type="text" id="f-n" placeholder="O que vamos fazer?">
+            <div style="display:flex; gap:10px">
+                <input type="time" id="f-s">
+                <input type="time" id="f-e">
+            </div>
             <select id="f-k">
                 <option value="Trabalho">💻 Trabalho</option>
                 <option value="Saúde">💪 Saúde</option>
@@ -79,55 +99,46 @@
                 <option value="Essencial">☕ Essencial</option>
             </select>
             <select id="f-d">
-                <option value="low">🍃 Baixa</option>
-                <option value="med" selected>⚡ Média</option>
-                <option value="high">🔥 Alta</option>
+                <option value="low">🍃 Drenagem Baixa</option>
+                <option value="med" selected>⚡ Drenagem Média</option>
+                <option value="high">🔥 Drenagem Alta</option>
             </select>
-            <button class="btn btn-p" onclick="API.add()">Salvar na Nuvem</button>
+            <button class="btn btn-p" id="addBtn" onclick="API.add()">Salvar Atividade</button>
         </div>
     </div>
 
     <div id="v-a" style="display:none">
         <div class="card">
-            <h4>Seu Tempo</h4>
+            <h4 style="margin:0 0 15px 0">Distribuição de Tempo</h4>
             <div style="height:250px"><canvas id="c-p"></canvas></div>
         </div>
     </div>
 </div>
 
 <script>
-
-
 const Cloud = {
     cred: JSON.parse(localStorage.getItem('ri_auth')),
     async login() {
-        const ghUser = document.getElementById('u-ghname').value.trim();
+        const user = document.getElementById('u-ghname').value.trim();
         const email = document.getElementById('u-email').value.trim();
         const token = document.getElementById('u-token').value.trim();
-        if(!ghUser || !token) return alert('Usuário GitHub e Token são obrigatórios!');
+        if(!user || !token) return alert('Preencha os dados corretamente!');
         
-        this.cred = { user: ghUser, token, file: `data_${btoa(email).substring(0,8)}.json` };
+        this.cred = { user, token, file: `data_${btoa(email).substring(0,8)}.json` };
         localStorage.setItem('ri_auth', JSON.stringify(this.cred));
-        location.reload(); // Recarrega para aplicar login
+        location.reload();
     },
     async request(method, body = null) {
         const url = `https://api.github.com/repos/${this.cred.user}/routine-db/contents/${this.cred.file}`;
-        const headers = { 
-            'Authorization': `token ${this.cred.token}`,
-            'Accept': 'application/vnd.github.v3+json'
-        };
+        const headers = { 'Authorization': `token ${this.cred.token}`, 'Accept': 'application/vnd.github.v3+json' };
 
         try {
             const res = await fetch(url, { headers });
             let sha = null;
-            
             if(res.ok) {
                 const data = await res.json();
                 sha = data.sha;
-                if(method === 'GET') {
-                    const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
-                    return { content, sha };
-                }
+                if(method === 'GET') return { content: JSON.parse(decodeURIComponent(escape(atob(data.content)))), sha };
             } else if (method === 'GET') {
                 await this.createRepo();
                 return { content: [], sha: null };
@@ -138,10 +149,10 @@ const Cloud = {
                 await fetch(url, {
                     method: 'PUT',
                     headers,
-                    body: JSON.stringify({ message: 'Update', content, sha })
+                    body: JSON.stringify({ message: 'Sync', content, sha })
                 });
             }
-        } catch(e) { console.error("Falha na sincronização:", e); }
+        } catch(e) { console.error("Erro Cloud:", e); }
     },
     async createRepo() {
         await fetch('https://api.github.com/user/repos', {
@@ -155,35 +166,48 @@ const Cloud = {
 const API = {
     db: [],
     async init() {
-        if(!this.cred && !Cloud.cred) return;
+        if(!Cloud.cred) return;
         const remote = await Cloud.request('GET');
         this.db = (remote && remote.content) ? remote.content : [];
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'block';
-        if(!localStorage.getItem('ri_energy')) document.getElementById('energyModal').style.display = 'flex';
+        if(!localStorage.getItem('ri_init')) document.getElementById('energyModal').style.display = 'flex';
         UI.render();
     },
     async add() {
+        const btn = document.getElementById('addBtn');
         const n = document.getElementById('f-n').value, s = document.getElementById('f-s').value, 
               e = document.getElementById('f-e').value, k = document.getElementById('f-k').value, d = document.getElementById('f-d').value;
-        if(!n || !s) return alert('Preencha nome e início!');
+        
+        if(!n || !s) return alert('Defina pelo menos o nome e início!');
+        
+        btn.innerText = "Sincronizando...";
+        btn.style.opacity = "0.7";
+
         this.db.push({ id: Date.now(), name: n, start: s, end: e, cat: k, drain: d, done: false });
         this.db.sort((a,b) => a.start.localeCompare(b.start));
+        
         UI.render();
         await Cloud.request('PUT', this.db);
+        
+        // Feedback visual e limpa campos
+        btn.innerText = "Salvar Atividade";
+        btn.style.opacity = "1";
+        document.getElementById('f-n').value = "";
+        UI.tab('h', document.querySelectorAll('.tab')[0]);
     },
     async toggle(id) {
         this.db = this.db.map(t => t.id === id ? {...t, done: !t.done} : t);
-        UI.render();
-        await Cloud.request('PUT', this.db);
+        UI.render(); // UI rápida
+        await Cloud.request('PUT', this.db); // Sync fundo
     },
     async remove(id) {
         this.db = this.db.filter(t => t.id !== id);
         UI.render();
         await Cloud.request('PUT', this.db);
     },
-    setEnergy(v) {
-        localStorage.setItem('ri_energy', v);
+    closeEnergy() {
+        localStorage.setItem('ri_init', 'true');
         document.getElementById('energyModal').style.display = 'none';
     }
 };
@@ -194,33 +218,44 @@ const UI = {
         ['h','c','a'].forEach(v => document.getElementById('v-'+v).style.display = v === t ? 'block' : 'none');
         document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
         el.classList.add('active');
-        if(t === 'a') this.renderChart();
+        if(t === 'a') setTimeout(() => this.renderChart(), 100);
     },
     render() {
         const list = document.getElementById('taskList');
         list.innerHTML = API.db.map(t => `
-            <div class="task ${t.done?'done':''}" style="border-right: 4px solid var(--${t.drain==='high'?'d':t.drain==='med'?'w':'s'})">
+            <div class="task ${t.done?'done':''}" style="border-left: 4px solid var(--${t.drain==='high'?'d':t.drain==='med'?'w':'s'})">
                 <div class="check ${t.done?'checked':''}" onclick="API.toggle(${t.id})"></div>
                 <div style="flex:1" onclick="API.toggle(${t.id})">
-                    <b>${t.name}</b><br>
-                    <small>${t.start} — ${t.end}</small>
+                    <b style="font-size:1.05rem">${t.name}</b><br>
+                    <small style="color:var(--mt)">${t.start} — ${t.end} | ${t.cat}</small>
                 </div>
-                <button onclick="API.remove(${t.id})" style="background:none; border:none; color:var(--d); font-size:1.2rem">×</button>
+                <button onclick="API.remove(${t.id})" style="background:none; border:none; color:var(--d); font-size:1.5rem; cursor:pointer">×</button>
             </div>
         `).join('');
-        const p = API.db.length ? Math.round((API.db.filter(t=>t.done).length / API.db.length) * 100) : 0;
+        
+        const done = API.db.filter(t=>t.done).length;
+        const p = API.db.length ? Math.round((done / API.db.length) * 100) : 0;
         document.getElementById('p-bar').style.width = p+'%';
         document.getElementById('p-txt').innerText = p+'%';
     },
     renderChart() {
-        const ctx = document.getElementById('c-p');
+        const canvas = document.getElementById('c-p');
+        if(!canvas) return;
+        const ctx = canvas.getContext('2d');
         const labels = ['Trabalho', 'Saúde', 'Lazer', 'Essencial'];
-        const data = labels.map(l => API.db.filter(t => t.cat.includes(l)).length);
+        const data = labels.map(l => API.db.filter(t => t.cat === l).length);
+        
         if(this.chart) this.chart.destroy();
         this.chart = new Chart(ctx, {
             type: 'doughnut',
-            data: { labels, datasets: [{ data, backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'], borderWidth: 0 }] },
-            options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#fff' } } } }
+            data: {
+                labels,
+                datasets: [{ data, backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'], borderWidth: 0 }]
+            },
+            options: { 
+                maintainAspectRatio: false, 
+                plugins: { legend: { position: 'bottom', labels: { color: '#f8fafc', padding: 20 } } } 
+            }
         });
     }
 };
