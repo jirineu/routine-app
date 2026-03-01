@@ -70,6 +70,9 @@
 </div>
 
 <div class="app" id="main-app">
+  <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+    <button class="btn" style="background: rgba(255,255,255,0.1); color: var(--mt); padding: 5px 12px; font-size: 0.75rem;" onclick="Cloud.logout()">Sair da Conta</button>
+</div>
     <div id="delayBox" class="alert">
         <span style="display:block; font-weight:700;">🚀 Hora de agir: <span id="delayTask"></span></span>
         <button class="btn btn-act" style="background:var(--p); color:white" onclick="API.rescheduleAll()">Adiar 15min</button>
@@ -133,6 +136,12 @@ const Cloud = {
     owner: "jirineu",
     cred: JSON.parse(localStorage.getItem('ri_auth')),
     
+    logout() {
+        if(confirm("Deseja realmente sair? Deve se Lembrar do E-mail e Token para entrar novamente.")) {
+            localStorage.clear();
+            location.reload();
+        }
+    },
     async login() {
         const email = document.getElementById('u-email').value.trim();
         const token = document.getElementById('u-token').value.trim();
