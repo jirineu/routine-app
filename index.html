@@ -1,3 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RoutineAI Pro Sync</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --p: #6366f1; --s: #10b981; --w: #f59e0b; --d: #ef4444;
+            --bg: #0f172a; --c: #1e293b; --t: #f8fafc; --mt: #94a3b8;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .app { width: 100%; max-width: 480px; display: none; animation: slideIn 0.4s ease; }
+        #auth-screen { width: 100%; max-width: 400px; text-align: center; margin-top: 5vh; }
+        
+        .card { background: var(--c); padding: 25px; border-radius: 24px; margin-bottom: 15px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
+        .alert { background: rgba(239, 68, 68, 0.15); border-left: 6px solid var(--d); padding: 20px; border-radius: 16px; margin-bottom: 15px; display: none; animation: slideIn 0.3s ease; }
+        
+        input, select { padding: 16px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: white; width: 100%; margin-bottom: 12px; font-size: 1rem; }
+        .btn { padding: 14px; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.2s; font-size: 0.9rem; }
+        .btn-p { background: var(--p); color: white; width: 100%; }
+        .btn-act { padding: 8px 16px; margin: 8px 8px 0 0; }
+
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; background: var(--c); padding: 6px; border-radius: 16px; position: sticky; top: 10px; z-index: 100; }
+        .tab { flex: 1; padding: 12px; border-radius: 12px; background: none; color: var(--mt); border: none; cursor: pointer; font-weight: 700; }
+        .tab.active { background: var(--p); color: white; }
+
+        .task { display: flex; align-items: center; gap: 15px; padding: 16px; border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02); transition: 0.3s; }
+        .task.done { opacity: 0.4; transform: scale(0.98); }
+        .task.drain-high { border-right: 4px solid var(--d); }
+        .task.drain-med { border-right: 4px solid var(--w); }
+        .task.drain-low { border-right: 4px solid var(--s); }
+
+        .check { width: 28px; height: 28px; border: 2.5px solid var(--p); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .check.checked { background: var(--s); border-color: var(--s); }
+        .check.checked::after { content: '✓'; color: white; font-weight: bold; }
+
+        .prog-bg { background: #334155; height: 12px; border-radius: 6px; flex: 1; overflow: hidden; margin: 10px 0; }
+        .prog-fill { height: 100%; background: var(--s); width: 0%; transition: 1s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        
+        #energyModal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(2, 6, 23, 0.95); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .energy-option { padding: 20px; border-radius: 15px; background: var(--c); text-align: center; cursor: pointer; border: 2px solid transparent; }
+    </style>
+</head>
+<body>
+
+<div id="auth-screen">
+    <div class="card">
+        <h2>RoutineAI Pro Sync ☁️</h2>
+        <input type="email" id="u-email" placeholder="E-mail">
+        <input type="password" id="u-token" placeholder="GitHub Token (PAT)">
+        <button class="btn btn-p" onclick="Cloud.login()">Entrar e Sincronizar</button>
+    </div>
+</div>
+
+<div id="energyModal">
+    <div class="card" style="text-align:center; width:100%">
+        <h2>Bom dia! ⚡</h2>
+        <p>Como está sua bateria hoje?</p>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:20px">
+            <div class="energy-option" onclick="API.setDailyEnergy(1)">🔋<br>Baixa</div>
+            <div class="energy-option" onclick="API.setDailyEnergy(3)">⚡<br>Média</div>
+            <div class="energy-option" onclick="API.setDailyEnergy(5)">🔥<br>Alta</div>
+        </div>
+    </div>
+</div>
+
+<div class="app" id="main-app">
+    <div id="delayBox" class="alert">
+        <span style="display:block; font-weight:700;">🚀 Hora de agir: <span id="delayTask"></span></span>
+        <button class="btn btn-act" style="background:var(--p); color:white" onclick="API.rescheduleAll()">Adiar 15min</button>
+        <button class="btn btn-act" style="background:var(--w); color:white" onclick="API.skip()">Pular esta</button>
+    </div>
+
+    <div class="tabs">
+        <button id="t-h" class="tab active" onclick="UI.tab('h')">Hoje</button>
+        <button id="t-c" class="tab" onclick="UI.tab('c')">Plano</button>
+        <button id="t-a" class="tab" onclick="UI.tab('a')">Analytics</button>
+    </div>
+
+    <div id="v-h">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; font-weight:800; font-size:0.8rem; color:var(--mt)">
+                <span>PROGRESSO</span><span id="p-txt">0%</span>
+            </div>
+            <div class="prog-bg"><div id="p-bar" class="prog-fill"></div></div>
+        </div>
+        <div id="taskList"></div>
+    </div>
+
+    <div id="v-c" style="display:none">
+        <div class="card">
+            <h3 style="margin-top:0">Novo Hábito</h3>
+            <input type="text" id="f-n" placeholder="Atividade...">
+            <div style="display:flex; gap:10px">
+                <input type="time" id="f-s">
+                <input type="time" id="f-e">
+            </div>
+            <select id="f-k">
+                <option value="Trabalho">💻 Trabalho</option>
+                <option value="Saúde">💪 Saúde</option>
+                <option value="Lazer">🎮 Lazer</option>
+                <option value="Essencial">☕ Essencial</option>
+            </select>
+            <select id="f-d">
+                <option value="low">🍃 Baixa</option>
+                <option value="med" selected>⚡ Média</option>
+                <option value="high">🔥 Alta</option>
+            </select>
+            <button class="btn btn-p" onclick="API.add()">Adicionar ao Plano</button>
+        </div>
+    </div>
+
+    <div id="v-a" style="display:none">
+        <div id="balanceAlert" class="alert" style="background:rgba(245,158,11,0.1); border-color:var(--w); color:var(--w); font-size:0.9rem"></div>
+        <div class="card">
+            <h4 style="margin:0">Onde está seu tempo? (Min)</h4>
+            <div style="height:220px"><canvas id="c-p"></canvas></div>
+        </div>
+        <div class="card">
+            <h4 style="margin:0">Carga por Categoria</h4>
+            <div style="height:220px"><canvas id="c-b"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<script>
 const Cloud = {
     owner: "jirineu",
     cred: JSON.parse(localStorage.getItem('ri_auth')),
@@ -71,3 +202,184 @@ const Cloud = {
         return method === 'GET' ? [] : null;
     }
 };
+const API = {
+    db: JSON.parse(localStorage.getItem('ri_pro_db') || '[]'),
+
+    async init() {
+        if(!Cloud.cred) return;
+        const checkDOM = setInterval(() => {
+            if(document.getElementById('main-app')) {
+                clearInterval(checkDOM);
+                this.setupApp();
+            }
+        }, 100);
+    },
+
+    async setupApp() {
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('main-app').style.display = 'block';
+        UI.render();
+        
+        const remote = await Cloud.request('GET');
+        // Se a nuvem retornou dados (mesmo que vazios), atualiza o banco local
+        if (remote && Array.isArray(remote)) {
+            this.db = remote;
+            localStorage.setItem('ri_pro_db', JSON.stringify(this.db));
+            UI.render();
+        }
+        
+        if(!localStorage.getItem('ri_energy_today')) {
+            const modal = document.getElementById('energyModal');
+            if(modal) modal.style.display = 'flex';
+        }
+        this.loop();
+    },
+
+    async sync() {
+        localStorage.setItem('ri_pro_db', JSON.stringify(this.db));
+        UI.render();
+        await Cloud.request('PUT', this.db);
+    },
+
+    add() {
+        const n = document.getElementById('f-n').value, 
+              s = document.getElementById('f-s').value, 
+              e = document.getElementById('f-e').value;
+              
+        if(!n || !s || !e) return alert("Preencha Nome e Horários!");
+        
+        this.db.push({ 
+            id: Date.now(), 
+            name: n, 
+            start: s, 
+            end: e, 
+            cat: document.getElementById('f-k').value, 
+            drain: document.getElementById('f-d').value, 
+            done: false 
+        });
+        
+        this.db.sort((a,b) => a.start.localeCompare(b.start));
+        this.sync();
+        document.getElementById('f-n').value = '';
+        UI.tab('h');
+    },
+
+    toggle(id) {
+        this.db = this.db.map(t => t.id === id ? {...t, done: !t.done} : t);
+        this.sync();
+    },
+
+    remove(id) {
+        if(confirm("Remover tarefa?")) {
+            this.db = this.db.filter(t => t.id !== id);
+            this.sync();
+        }
+    },
+
+    rescheduleAll() {
+        this.db = this.db.map(t => {
+            if(!t.done) {
+                const [h, m] = t.start.split(':').map(Number);
+                const d = new Date(); 
+                d.setHours(h, m + 15);
+                t.start = d.toTimeString().slice(0,5);
+            }
+            return t;
+        });
+        this.sync();
+    },
+
+    skip() {
+        const now = new Date().toTimeString().slice(0,5);
+        const task = this.db.find(t => !t.done && t.start < now);
+        if(task) this.toggle(task.id);
+    },
+
+    setDailyEnergy(val) {
+        localStorage.setItem('ri_energy_today', val);
+        document.getElementById('energyModal').style.display = 'none';
+    },
+
+    loop() {
+        const box = document.getElementById('delayBox'), 
+              taskSpan = document.getElementById('delayTask');
+        const now = new Date().toTimeString().slice(0,5);
+        const d = this.db.find(t => !t.done && t.start < now);
+        
+        if(box) {
+            box.style.display = d ? 'block' : 'none';
+            if(d) taskSpan.innerText = d.name;
+        }
+        setTimeout(() => this.loop(), 30000);
+    }
+};
+
+const UI = {
+    charts: {},
+    tab(t) {
+        ['h','c','a'].forEach(v => {
+            const view = document.getElementById('v-'+v);
+            const tab = document.getElementById('t-'+v);
+            if(view) view.style.display = v === t ? 'block' : 'none';
+            if(tab) tab.classList.toggle('active', v === t);
+        });
+        if(t === 'a') setTimeout(() => this.renderAnalytics(), 100);
+    },
+    render() {
+        const l = document.getElementById('taskList');
+        if(!l) return;
+        
+        l.innerHTML = API.db.map(t => `
+            <div class="task ${t.done ? 'done' : ''} drain-${t.drain}">
+                <div class="check ${t.done ? 'checked' : ''}" onclick="API.toggle(${t.id})"></div>
+                <div style="flex:1" onclick="API.toggle(${t.id})">
+                    <strong style="display:block">${t.name}</strong>
+                    <small style="color:var(--mt)">${t.start} — ${t.end} | ${t.cat}</small>
+                </div>
+                <button style="background:none; border:none; color:var(--d); cursor:pointer; font-size:1.2rem" onclick="API.remove(${t.id})">×</button>
+            </div>
+        `).join('');
+        
+        const done = API.db.filter(t => t.done).length;
+        const p = API.db.length ? Math.round((done/API.db.length)*100) : 0;
+        
+        const bar = document.getElementById('p-bar');
+        const txt = document.getElementById('p-txt');
+        if(bar) bar.style.width = p+'%';
+        if(txt) txt.innerText = p+'%';
+    },
+    renderAnalytics() {
+        const cats = ['Trabalho', 'Saúde', 'Lazer', 'Essencial'];
+        const getD = (s, e) => {
+            const [h1, m1] = s.split(':').map(Number), [h2, m2] = e.split(':').map(Number);
+            return Math.max(0, (h2 * 60 + m2) - (h1 * 60 + m1));
+        };
+        const data = cats.map(c => API.db.filter(t => t.cat === c).reduce((a, b) => a + getD(b.start, b.end), 0));
+        const colors = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'];
+        
+        const canvasP = document.getElementById('c-p');
+        const canvasB = document.getElementById('c-b');
+        
+        if(canvasP) {
+            if(this.charts.p) this.charts.p.destroy();
+            this.charts.p = new Chart(canvasP, { 
+                type: 'doughnut', 
+                data: { labels: cats, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] }, 
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#fff' } } } } 
+            });
+        }
+        
+        if(canvasB) {
+            if(this.charts.b) this.charts.b.destroy();
+            this.charts.b = new Chart(canvasB, { 
+                type: 'bar', 
+                data: { labels: cats, datasets: [{ label: 'Minutos', data, backgroundColor: colors, borderRadius: 8 }] }, 
+                options: { maintainAspectRatio: false, scales: { y: { ticks: { color: '#fff' } }, x: { ticks: { color: '#fff' } } } } 
+            });
+        }
+    }
+};
+window.addEventListener('DOMContentLoaded', () => API.init());
+</script>
+</body>
+</html>
